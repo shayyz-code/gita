@@ -100,7 +100,8 @@ export class MusicService {
     const params = new URLSearchParams({
       source: request.source,
       url: request.url,
-      seek: String(seek)
+      seek: String(seek),
+      t: String(Date.now())
     })
 
     return {
@@ -183,26 +184,51 @@ export class MusicService {
   private handleYoutubeProxy(url: string, response: ServerResponse, request: IncomingMessage): void {
     const args = ['-f', 'bestaudio[ext=m4a]/bestaudio', '--no-playlist', '-o', '-', url]
     const child = spawn('yt-dlp', args, { stdio: ['ignore', 'pipe', 'pipe'] })
+    let stderrTail = ''
+    let sentAudioHeaders = false
 
-    response.writeHead(200, {
-      'Content-Type': 'audio/mp4',
-      'Cache-Control': 'no-store',
-      Connection: 'keep-alive'
+    child.stderr.on('data', (chunk: Buffer) => {
+      stderrTail = `${stderrTail}${chunk.toString('utf8')}`.slice(-600)
     })
 
-    child.stdout.pipe(response)
+    child.stdout.on('data', (chunk: Buffer) => {
+      if (!sentAudioHeaders) {
+        response.writeHead(200, {
+          'Content-Type': 'audio/mp4',
+          'Cache-Control': 'no-store',
+          Connection: 'keep-alive'
+        })
+        sentAudioHeaders = true
+      }
 
-    child.stderr.on('data', () => {
-      // ignore yt-dlp progress logs
+      response.write(chunk)
     })
 
-    child.once('error', () => {
+    child.stdout.once('end', () => {
       if (!response.writableEnded) {
         response.end()
       }
     })
 
-    child.once('close', () => {
+    child.once('error', (error) => {
+      if (!response.headersSent) {
+        response.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' })
+        response.end(`yt-dlp failed to start: ${error.message}`)
+        return
+      }
+
+      if (!response.writableEnded) {
+        response.end()
+      }
+    })
+
+    child.once('close', (code) => {
+      if (!response.headersSent && code !== 0) {
+        response.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' })
+        response.end(`yt-dlp failed (exit ${String(code)}): ${stderrTail || 'Unknown error'}`)
+        return
+      }
+
       if (!response.writableEnded) {
         response.end()
       }

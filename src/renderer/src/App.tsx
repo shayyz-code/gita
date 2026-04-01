@@ -1,4 +1,4 @@
-import { ChangeEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { ChangeEvent, KeyboardEvent, useEffect, useRef, useState } from 'react'
 
 type SourceType = 'youtube' | 'soundcloud' | 'local'
 
@@ -89,6 +89,7 @@ function App(): React.JSX.Element {
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const currentTrackIdRef = useRef<string>('')
+  const retryByTrackRef = useRef<Record<string, number>>({})
   const initialRpcClientIdRef = useRef(rpcClientId)
   const tracksRef = useRef<Track[]>([])
 
@@ -226,6 +227,7 @@ function App(): React.JSX.Element {
       return
     }
 
+    retryByTrackRef.current[selectedTrack.id] = 0
     setCurrentIndex(nextIndex)
     setProgressSeconds(0)
     setDurationSeconds(selectedTrack.durationSec || 0)
@@ -298,6 +300,33 @@ function App(): React.JSX.Element {
     })
 
     setMessage(playNow ? `${result.title} added and playing.` : `${result.title} added to queue.`)
+  }
+
+  const tryRecoverRemoteStream = (reason: string): void => {
+    if (!currentTrack || currentTrack.source === 'local') {
+      return
+    }
+
+    const retries = retryByTrackRef.current[currentTrack.id] || 0
+    if (retries >= 1) {
+      setMessage(`Playback interrupted (${reason}). Try replaying the track.`)
+      setIsPlaying(false)
+      return
+    }
+
+    retryByTrackRef.current[currentTrack.id] = retries + 1
+    const seek = Math.max(0, Math.floor(audioRef.current?.currentTime || progressSeconds || 0))
+    setMessage(`Reconnecting stream for "${currentTrack.title}"...`)
+
+    void loadTrackAudio(currentTrack, seek)
+      .then(() => {
+        setIsPlaying(true)
+        setMessage(`Reconnected "${currentTrack.title}".`)
+      })
+      .catch((error: Error) => {
+        setMessage(`Failed to recover stream: ${error.message}`)
+        setIsPlaying(false)
+      })
   }
 
   const addLocalFiles = (event: ChangeEvent<HTMLInputElement>): void => {
@@ -414,142 +443,175 @@ function App(): React.JSX.Element {
       })
   }
 
-  const activeInitial = useMemo(() => {
-    return currentTrack?.title?.charAt(0).toUpperCase() || 'G'
-  }, [currentTrack])
+  const renderArtwork = (track: Track | null, className: string): React.JSX.Element => {
+    if (track?.thumbnail) {
+      return <img className={className} src={track.thumbnail} alt={`${track.title} artwork`} />
+    }
+
+    return <div className={`${className} artwork-fallback`}>{(track?.title?.charAt(0) || 'G').toUpperCase()}</div>
+  }
 
   return (
-    <div className="app-shell">
-      <aside className="sidebar">
-        <h1>Gita</h1>
-        <p className="sidebar-subtitle">Apple Music-inspired desktop player</p>
+    <div className="window-shell">
+      <div className="window-drag-region" aria-hidden="true" />
+      <div className="app-shell">
+        <aside className="sidebar">
+          <h1>Gita</h1>
+          <p className="sidebar-subtitle">Desktop music player with Spotify-inspired UI</p>
 
-        <div className="panel">
-          <h2>Search Songs</h2>
-          <input
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            onKeyDown={onSearchKeyDown}
-            placeholder="Search YouTube + SoundCloud"
-          />
-          <button onClick={onSearch} disabled={searching}>
-            {searching ? 'Searching...' : 'Search'}
-          </button>
-          <ul className="search-results">
-            {searchResults.map((result) => (
-              <li key={result.id} className="search-item">
-                <div>
-                  <p className="queue-title">{result.title}</p>
-                  <p className="queue-artist">
-                    {result.artist} • {formatTime(result.durationSec)}
-                  </p>
-                </div>
-                <div className="search-actions">
-                  <button onClick={() => addResultToQueue(result, true)}>Play</button>
-                  <button onClick={() => addResultToQueue(result, false)}>Add</button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="panel">
-          <h2>Add Local Files</h2>
-          <label className="upload">
-            Import audio
-            <input type="file" accept="audio/*" multiple onChange={addLocalFiles} />
-          </label>
-        </div>
-
-        <div className="panel">
-          <h2>Discord RPC</h2>
-          <input
-            value={rpcClientId}
-            onChange={(event) => setRpcClientId(event.target.value)}
-            placeholder="Discord Client ID"
-          />
-          <button onClick={saveDiscordClientId}>Save RPC Client ID</button>
-          <button onClick={sendTestRpc}>Test RPC</button>
-          <p className="rpc-status">{rpcStatusText}</p>
-        </div>
-      </aside>
-
-      <main className="main-content">
-        <section className="hero">
-          <div className="cover-art">{activeInitial}</div>
-          <div>
-            <p className="eyebrow">Now Playing</p>
-            <h2>{currentTrack?.title || 'No track selected'}</h2>
-            <p className="artist-line">{currentTrack?.artist || 'Search and play a song'}</p>
-            <p className={currentTrack ? SOURCE_STYLES[currentTrack.source] : 'source-chip'}>
-              {currentTrack ? sourceLabel[currentTrack.source] : 'No Source'}
-            </p>
-          </div>
-        </section>
-
-        <section className="player-card">
-          <audio
-            ref={audioRef}
-            src={currentAudioSrc || undefined}
-            preload="auto"
-            onLoadedMetadata={(event) => {
-              if (event.currentTarget.duration > 0) {
-                setDurationSeconds(event.currentTarget.duration)
-              }
-            }}
-            onTimeUpdate={(event) => {
-              setProgressSeconds(event.currentTarget.currentTime)
-            }}
-            onEnded={goNext}
-          />
-
-          <div className="transport">
-            <button onClick={goPrev}>Prev</button>
-            <button onClick={togglePlayback} disabled={!currentTrack}>
-              {isPlaying ? 'Pause' : 'Play'}
-            </button>
-            <button onClick={goNext}>Next</button>
+          <div className="panel">
+            <h2>Add Local Files</h2>
+            <label className="upload">
+              Import audio
+              <input type="file" accept="audio/*" multiple onChange={addLocalFiles} />
+            </label>
           </div>
 
-          <div className="progress-wrap">
-            <span>{formatTime(progressSeconds)}</span>
+          <div className="panel">
+            <h2>Discord RPC</h2>
             <input
-              type="range"
-              min={0}
-              max={durationSeconds || 0}
-              step={1}
-              disabled={!canSeek || durationSeconds <= 0}
-              value={Math.min(progressSeconds, durationSeconds || 0)}
-              onChange={(event) => seekTrack(Number(event.target.value))}
+              value={rpcClientId}
+              onChange={(event) => setRpcClientId(event.target.value)}
+              placeholder="Discord Client ID"
             />
-            <span>{formatTime(durationSeconds)}</span>
+            <button onClick={saveDiscordClientId}>Save RPC Client ID</button>
+            <button onClick={sendTestRpc}>Test RPC</button>
+            <p className="rpc-status">{rpcStatusText}</p>
           </div>
+        </aside>
 
-          <p className="hint">Native playback with full transport controls. Seeking is enabled for local tracks.</p>
-        </section>
-      </main>
+        <main className="main-content">
+          <section className="hero">
+            {renderArtwork(currentTrack, 'cover-art')}
+            <div>
+              <p className="eyebrow">Now Playing</p>
+              <h2>{currentTrack?.title || 'No track selected'}</h2>
+              <p className="artist-line">{currentTrack?.artist || 'Search and play a song'}</p>
+              <p className={currentTrack ? SOURCE_STYLES[currentTrack.source] : 'source-chip'}>
+                {currentTrack ? sourceLabel[currentTrack.source] : 'No Source'}
+              </p>
+            </div>
+          </section>
 
-      <aside className="queue-panel">
-        <h2>Queue</h2>
-        <p className="status-message">{message}</p>
-        <ul>
-          {tracks.map((track, index) => (
-            <li
-              key={track.id}
-              className={index === currentIndex ? 'queue-item active' : 'queue-item'}
-              onClick={() => activateTrack(index)}
-            >
-              <div>
-                <p className="queue-title">{track.title}</p>
-                <p className="queue-artist">
-                  {track.artist} • {formatTime(track.durationSec)}
-                </p>
+          <section className="browse-panel">
+            <div className="browse-header">
+              <h2>Search Songs</h2>
+              <div className="search-bar">
+                <input
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  onKeyDown={onSearchKeyDown}
+                  placeholder="Search YouTube + SoundCloud"
+                />
+                <button onClick={onSearch} disabled={searching}>
+                  {searching ? 'Searching...' : 'Search'}
+                </button>
               </div>
-              <span className={SOURCE_STYLES[track.source]}>{sourceLabel[track.source]}</span>
-            </li>
-          ))}
-        </ul>
-      </aside>
+            </div>
+
+            <ul className="search-results">
+              {searchResults.length ? (
+                searchResults.map((result) => (
+                  <li key={result.id} className="search-item">
+                    {renderArtwork(result, 'search-art')}
+                    <div>
+                      <p className="queue-title">{result.title}</p>
+                      <p className="queue-artist">
+                        {result.artist} • {formatTime(result.durationSec)}
+                      </p>
+                    </div>
+                    <div className="search-actions">
+                      <button onClick={() => addResultToQueue(result, true)}>Play</button>
+                      <button onClick={() => addResultToQueue(result, false)}>Add</button>
+                    </div>
+                  </li>
+                ))
+              ) : (
+                <li className="empty-state">Search for a track to start building your queue.</li>
+              )}
+            </ul>
+          </section>
+
+          <section className="player-card">
+            <audio
+              ref={audioRef}
+              src={currentAudioSrc || undefined}
+              preload="auto"
+              onWaiting={() => {
+                if (currentTrack && currentTrack.source !== 'local') {
+                  setMessage(`Buffering "${currentTrack.title}"...`)
+                }
+              }}
+              onStalled={() => {
+                tryRecoverRemoteStream('stalled')
+              }}
+              onError={() => {
+                tryRecoverRemoteStream('audio error')
+              }}
+              onLoadedMetadata={(event) => {
+                if (event.currentTarget.duration > 0) {
+                  setDurationSeconds(event.currentTarget.duration)
+                }
+              }}
+              onTimeUpdate={(event) => {
+                setProgressSeconds(event.currentTarget.currentTime)
+              }}
+              onEnded={goNext}
+            />
+
+            <div className="transport">
+              <button onClick={goPrev}>Prev</button>
+              <button onClick={togglePlayback} disabled={!currentTrack}>
+                {isPlaying ? 'Pause' : 'Play'}
+              </button>
+              <button onClick={goNext}>Next</button>
+            </div>
+
+            <div className="progress-wrap">
+              <span>{formatTime(progressSeconds)}</span>
+              <input
+                type="range"
+                min={0}
+                max={durationSeconds || 0}
+                step={1}
+                disabled={!canSeek || durationSeconds <= 0}
+                value={Math.min(progressSeconds, durationSeconds || 0)}
+                onChange={(event) => seekTrack(Number(event.target.value))}
+              />
+              <span>{formatTime(durationSeconds)}</span>
+            </div>
+
+            <p className="hint">Native playback with full transport controls. Seeking is enabled for local tracks.</p>
+          </section>
+        </main>
+
+        <aside className="queue-panel">
+          <h2>Queue</h2>
+          <p className="status-message">{message}</p>
+          <ul>
+            {tracks.length ? (
+              tracks.map((track, index) => (
+                <li
+                  key={track.id}
+                  className={index === currentIndex ? 'queue-item active' : 'queue-item'}
+                  onClick={() => activateTrack(index)}
+                >
+                  {renderArtwork(track, 'queue-art')}
+                  <div>
+                    <p className="queue-title">{track.title}</p>
+                    <p className="queue-artist">
+                      {track.artist} • {formatTime(track.durationSec)}
+                    </p>
+                  </div>
+                  <span className={SOURCE_STYLES[track.source]}>{sourceLabel[track.source]}</span>
+                </li>
+              ))
+            ) : (
+              <li className="empty-state">Your queue is empty. Add songs from search or local files.</li>
+            )}
+          </ul>
+        </aside>
+      </div>
     </div>
   )
 }
