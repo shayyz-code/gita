@@ -1,6 +1,7 @@
 import { ChangeEvent, KeyboardEvent, useEffect, useRef, useState } from 'react'
 
 type SourceType = 'youtube' | 'soundcloud' | 'local'
+type NavSection = 'browse' | 'playlists' | 'favourites' | 'settings'
 
 type Track = {
   id: string
@@ -24,6 +25,13 @@ const SOURCE_STYLES: Record<SourceType, string> = {
   soundcloud: 'source-chip source-chip-soundcloud',
   local: 'source-chip source-chip-local'
 }
+
+const NAV_ITEMS: Array<{ id: NavSection; label: string }> = [
+  { id: 'browse', label: 'Browse' },
+  { id: 'playlists', label: 'Playlists' },
+  { id: 'favourites', label: 'Favourites' },
+  { id: 'settings', label: 'Settings' }
+]
 
 const envDiscordClientId = (import.meta.env.VITE_DISCORD_CLIENT_ID || '').trim()
 
@@ -81,6 +89,7 @@ function App(): React.JSX.Element {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<Track[]>([])
   const [searching, setSearching] = useState(false)
+  const [activeNav, setActiveNav] = useState<NavSection>('browse')
 
   const [rpcClientId, setRpcClientId] = useState(
     () => envDiscordClientId || localStorage.getItem('gita.discordClientId') || ''
@@ -462,68 +471,94 @@ function App(): React.JSX.Element {
         <aside className="sidebar">
           <h1>Gita</h1>
           <p className="sidebar-subtitle">Music player by Shayy</p>
-
-          <div className="panel">
-            <h2>Add Local Files</h2>
-            <label className="upload">
-              Import audio
-              <input type="file" accept="audio/*" multiple onChange={addLocalFiles} />
-            </label>
-          </div>
-
-          <div className="panel settings-panel">
-            <h2>Settings</h2>
-            <p className="settings-section-title">Discord RPC</p>
-            <input
-              value={rpcClientId}
-              onChange={(event) => setRpcClientId(event.target.value)}
-              placeholder="Discord Client ID"
-            />
-            <button onClick={saveDiscordClientId}>Save RPC Client ID</button>
-            <button onClick={sendTestRpc}>Test RPC</button>
-            <p className="rpc-status">{rpcStatusText}</p>
-          </div>
+          <nav className="sidebar-nav">
+            {NAV_ITEMS.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={activeNav === item.id ? 'nav-item active' : 'nav-item'}
+                onClick={() => setActiveNav(item.id)}
+              >
+                {item.label}
+              </button>
+            ))}
+          </nav>
         </aside>
 
         <main className="main-content">
-          <section className="browse-panel">
-            <div className="browse-header">
-              <h2>Search</h2>
-              <div className="search-bar">
-                <input
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  onKeyDown={onSearchKeyDown}
-                  placeholder="Search for songs here..."
-                />
-                <button onClick={onSearch} disabled={searching}>
-                  {searching ? 'Searching...' : 'Search'}
-                </button>
+          {activeNav === 'browse' && (
+            <section className="browse-panel">
+              <div className="browse-header">
+                <h2>Search</h2>
+                <div className="search-bar">
+                  <input
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    onKeyDown={onSearchKeyDown}
+                    placeholder="Search for songs here..."
+                  />
+                  <button onClick={onSearch} disabled={searching}>
+                    {searching ? 'Searching...' : 'Search'}
+                  </button>
+                </div>
               </div>
-            </div>
 
-            <ul className="search-results">
-              {searchResults.length ? (
-                searchResults.map((result) => (
-                  <li key={result.id} className="search-item">
-                    {renderArtwork(result, 'search-art')}
-                    <div>
-                      <p className="queue-title">{result.title}</p>
-                      <p className="queue-artist">
-                        {result.artist} • {formatTime(result.durationSec)}
-                      </p>
-                    </div>
-                    <div className="search-actions">
-                      <button onClick={() => addResultToQueue(result, true)}>Play</button>
-                      <button onClick={() => addResultToQueue(result, false)}>Add</button>
-                    </div>
-                  </li>
-                ))
-              ) : (
-                <li className="empty-state">Search for a track to start building your queue.</li>
-              )}
-            </ul>
-          </section>
+              <ul className="search-results">
+                {searchResults.length ? (
+                  searchResults.map((result) => (
+                    <li key={result.id} className="search-item">
+                      {renderArtwork(result, 'search-art')}
+                      <div>
+                        <p className="queue-title">{result.title}</p>
+                        <p className="queue-artist">
+                          {result.artist} • {formatTime(result.durationSec)}
+                        </p>
+                      </div>
+                      <div className="search-actions">
+                        <button onClick={() => addResultToQueue(result, true)}>Play</button>
+                        <button onClick={() => addResultToQueue(result, false)}>Add</button>
+                      </div>
+                    </li>
+                  ))
+                ) : (
+                  <li className="empty-state">Search for a track to start building your queue.</li>
+                )}
+              </ul>
+            </section>
+          )}
+
+          {activeNav === 'playlists' && (
+            <section className="content-panel">
+              <h2>Playlists</h2>
+              <p className="content-subtitle">Import local tracks and manage your queue as a playlist.</p>
+              <label className="upload">
+                Import audio
+                <input type="file" accept="audio/*" multiple onChange={addLocalFiles} />
+              </label>
+            </section>
+          )}
+
+          {activeNav === 'favourites' && (
+            <section className="content-panel">
+              <h2>Favourites</h2>
+              <p className="content-subtitle">Pin and manage favourite tracks here.</p>
+            </section>
+          )}
+
+          {activeNav === 'settings' && (
+            <section className="content-panel settings-panel">
+              <h2>Settings</h2>
+              <p className="settings-section-title">Discord RPC</p>
+              <input
+                value={rpcClientId}
+                onChange={(event) => setRpcClientId(event.target.value)}
+                placeholder="Discord Client ID"
+              />
+              <button onClick={saveDiscordClientId}>Save RPC Client ID</button>
+              <button onClick={sendTestRpc}>Test RPC</button>
+              <p className="rpc-status">{rpcStatusText}</p>
+            </section>
+          )}
 
           <section className="player-card">
             <audio
