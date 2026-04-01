@@ -83,10 +83,13 @@ export class MusicService {
       return []
     }
 
-    const [youtube, soundcloud] = await Promise.all([
+    const [youtubeResult, soundcloudResult] = await Promise.allSettled([
       this.searchYoutube(cleanedQuery),
       this.searchSoundCloud(cleanedQuery)
     ])
+
+    const youtube = youtubeResult.status === 'fulfilled' ? youtubeResult.value : []
+    const soundcloud = soundcloudResult.status === 'fulfilled' ? soundcloudResult.value : []
 
     return [...youtube, ...soundcloud]
   }
@@ -240,24 +243,30 @@ export class MusicService {
   }
 
   private async searchYoutube(query: string): Promise<SearchResult[]> {
-    const results = await play.search(query, {
-      source: {
-        youtube: 'video'
-      },
-      limit: 8
-    })
+    try {
+      const results = await play.search(query, {
+        source: {
+          youtube: 'video'
+        },
+        limit: 8
+      })
 
-    return results
-      .filter((item) => item.url)
-      .map((item) => ({
-        id: `yt:${item.id || item.url}`,
-        source: 'youtube',
-        url: item.url,
-        title: item.title || 'Unknown Title',
-        artist: item.channel?.name || 'YouTube',
-        durationSec: item.durationInSec || 0,
-        thumbnail: item.thumbnails?.[0]?.url
-      }))
+      return results
+        .filter((item) => item.url)
+        .map((item) => ({
+          id: `yt:${item.id || item.url}`,
+          source: 'youtube',
+          url: item.url,
+          title: item.title || 'Unknown Title',
+          artist: item.channel?.name || 'YouTube',
+          durationSec: item.durationInSec || 0,
+          thumbnail: item.thumbnails?.[0]?.url
+        }))
+    } catch {
+      // play-dl can intermittently fail when YouTube response shapes change.
+      // Fallback to yt-dlp search so the app remains usable.
+      return this.searchYoutubeViaYtDlp(query)
+    }
   }
 
   private async searchSoundCloud(query: string): Promise<SearchResult[]> {
@@ -303,6 +312,69 @@ export class MusicService {
     })
 
     this.soundCloudReady = true
+  }
+
+  private async searchYoutubeViaYtDlp(query: string): Promise<SearchResult[]> {
+    return new Promise<SearchResult[]>((resolve) => {
+      const child = spawn('yt-dlp', ['--dump-single-json', '--no-warnings', 'ytsearch8:' + query], {
+        stdio: ['ignore', 'pipe', 'pipe']
+      })
+
+      let stdout = ''
+
+      child.stdout.on('data', (chunk: Buffer) => {
+        stdout += chunk.toString('utf8')
+      })
+
+      child.once('error', () => {
+        resolve([])
+      })
+
+      child.once('close', (code) => {
+        if (code !== 0 || !stdout.trim()) {
+          resolve([])
+          return
+        }
+
+        try {
+          const payload = JSON.parse(stdout) as {
+            entries?: Array<{
+              id?: string
+              title?: string
+              duration?: number
+              uploader?: string
+              channel?: string
+              webpage_url?: string
+              url?: string
+              thumbnail?: string
+            }>
+          }
+          const entries = payload.entries || []
+
+          const mapped: SearchResult[] = []
+          for (const entry of entries) {
+            const videoUrl = entry.webpage_url || entry.url
+            if (!videoUrl) {
+              continue
+            }
+
+            mapped.push({
+              id: `yt:${entry.id || videoUrl}`,
+              source: 'youtube',
+              url: videoUrl,
+              title: entry.title || 'Unknown Title',
+              artist: entry.uploader || entry.channel || 'YouTube',
+              durationSec: Number.isFinite(entry.duration) ? Math.max(0, Math.floor(entry.duration || 0)) : 0,
+              thumbnail: entry.thumbnail
+            })
+          }
+
+          resolve(mapped)
+        } catch {
+          resolve([])
+        }
+      })
+    })
   }
 }
 

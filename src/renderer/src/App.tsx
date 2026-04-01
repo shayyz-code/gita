@@ -93,7 +93,7 @@ function App(): React.JSX.Element {
   const initialRpcClientIdRef = useRef(rpcClientId)
   const tracksRef = useRef<Track[]>([])
 
-  const currentTrack = currentIndex >= 0 ? tracks[currentIndex] ?? null : null
+  const currentTrack = currentIndex >= 0 ? (tracks[currentIndex] ?? null) : null
   const canSeek = currentTrack?.source === 'local'
 
   useEffect(() => {
@@ -448,7 +448,11 @@ function App(): React.JSX.Element {
       return <img className={className} src={track.thumbnail} alt={`${track.title} artwork`} />
     }
 
-    return <div className={`${className} artwork-fallback`}>{(track?.title?.charAt(0) || 'G').toUpperCase()}</div>
+    return (
+      <div className={`${className} artwork-fallback`}>
+        {(track?.title?.charAt(0) || 'G').toUpperCase()}
+      </div>
+    )
   }
 
   return (
@@ -457,7 +461,7 @@ function App(): React.JSX.Element {
       <div className="app-shell">
         <aside className="sidebar">
           <h1>Gita</h1>
-          <p className="sidebar-subtitle">Desktop music player with Spotify-inspired UI</p>
+          <p className="sidebar-subtitle">Music player by Shayy</p>
 
           <div className="panel">
             <h2>Add Local Files</h2>
@@ -467,8 +471,9 @@ function App(): React.JSX.Element {
             </label>
           </div>
 
-          <div className="panel">
-            <h2>Discord RPC</h2>
+          <div className="panel settings-panel">
+            <h2>Settings</h2>
+            <p className="settings-section-title">Discord RPC</p>
             <input
               value={rpcClientId}
               onChange={(event) => setRpcClientId(event.target.value)}
@@ -481,27 +486,15 @@ function App(): React.JSX.Element {
         </aside>
 
         <main className="main-content">
-          <section className="hero">
-            {renderArtwork(currentTrack, 'cover-art')}
-            <div>
-              <p className="eyebrow">Now Playing</p>
-              <h2>{currentTrack?.title || 'No track selected'}</h2>
-              <p className="artist-line">{currentTrack?.artist || 'Search and play a song'}</p>
-              <p className={currentTrack ? SOURCE_STYLES[currentTrack.source] : 'source-chip'}>
-                {currentTrack ? sourceLabel[currentTrack.source] : 'No Source'}
-              </p>
-            </div>
-          </section>
-
           <section className="browse-panel">
             <div className="browse-header">
-              <h2>Search Songs</h2>
+              <h2>Search</h2>
               <div className="search-bar">
                 <input
                   value={searchQuery}
                   onChange={(event) => setSearchQuery(event.target.value)}
                   onKeyDown={onSearchKeyDown}
-                  placeholder="Search YouTube + SoundCloud"
+                  placeholder="Search for songs here..."
                 />
                 <button onClick={onSearch} disabled={searching}>
                   {searching ? 'Searching...' : 'Search'}
@@ -559,6 +552,18 @@ function App(): React.JSX.Element {
               onEnded={goNext}
             />
 
+            <div className="player-now-playing">
+              {renderArtwork(currentTrack, 'now-playing-art')}
+              <div>
+                <p className="eyebrow">Now Playing</p>
+                <p className="now-playing-title">{currentTrack?.title || 'No track selected'}</p>
+                <p className="artist-line">{currentTrack?.artist || 'Search and play a song'}</p>
+              </div>
+              <p className={currentTrack ? SOURCE_STYLES[currentTrack.source] : 'source-chip'}>
+                {currentTrack ? sourceLabel[currentTrack.source] : 'No Source'}
+              </p>
+            </div>
+
             <div className="transport">
               <button onClick={goPrev}>Prev</button>
               <button onClick={togglePlayback} disabled={!currentTrack}>
@@ -581,7 +586,9 @@ function App(): React.JSX.Element {
               <span>{formatTime(durationSeconds)}</span>
             </div>
 
-            <p className="hint">Native playback with full transport controls. Seeking is enabled for local tracks.</p>
+            <p className="hint">
+              Native playback with full transport controls. Seeking is enabled for local tracks.
+            </p>
           </section>
         </main>
 
@@ -607,7 +614,9 @@ function App(): React.JSX.Element {
                 </li>
               ))
             ) : (
-              <li className="empty-state">Your queue is empty. Add songs from search or local files.</li>
+              <li className="empty-state">
+                Your queue is empty. Add songs from search or local files.
+              </li>
             )}
           </ul>
         </aside>
