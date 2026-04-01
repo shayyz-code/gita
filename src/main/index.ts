@@ -4,8 +4,10 @@ import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { DiscordRpcBridge, type RpcPresence } from './discordRpc'
+import { MusicService, type PlaybackRequest } from './musicService'
 
 const rpc = new DiscordRpcBridge()
+const musicService = new MusicService()
 
 function readClientIdFromDotEnv(): string {
   const envFiles = [join(process.cwd(), '.env.local'), join(process.cwd(), '.env')]
@@ -105,6 +107,14 @@ app.whenReady().then(() => {
     return rpc.getStatus()
   })
 
+  ipcMain.handle('music:search', async (_, query: string) => {
+    return musicService.search(query)
+  })
+
+  ipcMain.handle('music:get-playback-url', async (_, payload: PlaybackRequest) => {
+    return musicService.getPlaybackUrl(payload)
+  })
+
   const envClientId = (
     process.env.DISCORD_CLIENT_ID ||
     process.env.MAIN_VITE_DISCORD_CLIENT_ID ||
@@ -115,6 +125,7 @@ app.whenReady().then(() => {
   if (envClientId) {
     void rpc.setClientId(envClientId)
   }
+  void musicService.start()
 
   createWindow()
 
@@ -125,6 +136,7 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   rpc.disconnect()
+  void musicService.stop()
 
   if (process.platform !== 'darwin') {
     app.quit()

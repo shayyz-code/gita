@@ -21,13 +21,38 @@ type RpcPresence = {
   endTimestamp?: number
 }
 
+type MusicSource = 'youtube' | 'soundcloud'
+
+type MusicSearchResult = {
+  id: string
+  source: MusicSource
+  url: string
+  title: string
+  artist: string
+  durationSec: number
+  thumbnail?: string
+}
+
+type MusicPlaybackRequest = {
+  source: MusicSource
+  url: string
+  seek?: number
+}
+
+type MusicPlaybackResponse = {
+  playbackUrl: string
+}
+
 const api = {
   rpcSetClientId: (clientId: string): Promise<RpcStatus> =>
     ipcRenderer.invoke('rpc:set-client-id', clientId),
   rpcGetStatus: (): Promise<RpcStatus> => ipcRenderer.invoke('rpc:get-status'),
   rpcUpdatePresence: (payload: RpcPresence): Promise<RpcStatus> =>
     ipcRenderer.invoke('rpc:update-presence', payload),
-  rpcClearPresence: (): Promise<RpcStatus> => ipcRenderer.invoke('rpc:clear-presence')
+  rpcClearPresence: (): Promise<RpcStatus> => ipcRenderer.invoke('rpc:clear-presence'),
+  musicSearch: (query: string): Promise<MusicSearchResult[]> => ipcRenderer.invoke('music:search', query),
+  musicGetPlaybackUrl: (payload: MusicPlaybackRequest): Promise<MusicPlaybackResponse> =>
+    ipcRenderer.invoke('music:get-playback-url', payload)
 }
 
 if (process.contextIsolated) {
@@ -44,4 +69,11 @@ if (process.contextIsolated) {
   window.api = api
 }
 
-export type { RpcPresence, RpcStatus }
+export type {
+  MusicPlaybackRequest,
+  MusicPlaybackResponse,
+  MusicSearchResult,
+  MusicSource,
+  RpcPresence,
+  RpcStatus
+}

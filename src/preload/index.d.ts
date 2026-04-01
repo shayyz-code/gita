@@ -20,11 +20,35 @@ export type RpcPresence = {
   endTimestamp?: number
 }
 
+export type MusicSource = 'youtube' | 'soundcloud'
+
+export type MusicSearchResult = {
+  id: string
+  source: MusicSource
+  url: string
+  title: string
+  artist: string
+  durationSec: number
+  thumbnail?: string
+}
+
+export type MusicPlaybackRequest = {
+  source: MusicSource
+  url: string
+  seek?: number
+}
+
+export type MusicPlaybackResponse = {
+  playbackUrl: string
+}
+
 export type RendererApi = {
   rpcSetClientId: (clientId: string) => Promise<RpcStatus>
   rpcGetStatus: () => Promise<RpcStatus>
   rpcUpdatePresence: (payload: RpcPresence) => Promise<RpcStatus>
   rpcClearPresence: () => Promise<RpcStatus>
+  musicSearch: (query: string) => Promise<MusicSearchResult[]>
+  musicGetPlaybackUrl: (payload: MusicPlaybackRequest) => Promise<MusicPlaybackResponse>
 }
 
 declare global {

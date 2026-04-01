@@ -1,32 +1,17 @@
-import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { ChangeEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react'
 
 type SourceType = 'youtube' | 'soundcloud' | 'local'
 
 type Track = {
   id: string
-  title: string
-  artist: string
   source: SourceType
   url: string
+  title: string
+  artist: string
+  durationSec: number
+  thumbnail?: string
   localObjectUrl?: string
 }
-
-const starterTracks: Track[] = [
-  {
-    id: crypto.randomUUID(),
-    title: 'lofi hip hop radio',
-    artist: 'Lofi Girl',
-    source: 'youtube',
-    url: 'https://www.youtube.com/watch?v=jfKfPfyJRdk'
-  },
-  {
-    id: crypto.randomUUID(),
-    title: 'On Hold',
-    artist: 'The xx',
-    source: 'soundcloud',
-    url: 'https://soundcloud.com/thexx/on-hold'
-  }
-]
 
 const sourceLabel: Record<SourceType, string> = {
   youtube: 'YouTube',
@@ -42,52 +27,8 @@ const SOURCE_STYLES: Record<SourceType, string> = {
 
 const envDiscordClientId = (import.meta.env.VITE_DISCORD_CLIENT_ID || '').trim()
 
-function extractYoutubeId(url: string): string | null {
-  const trimmed = url.trim()
-
-  const directMatch = trimmed.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([A-Za-z0-9_-]{11})/)
-  if (directMatch) {
-    return directMatch[1]
-  }
-
-  const embedMatch = trimmed.match(/youtube\.com\/embed\/([A-Za-z0-9_-]{11})/)
-  if (embedMatch) {
-    return embedMatch[1]
-  }
-
-  return null
-}
-
-function detectSource(url: string): SourceType | null {
-  const lower = url.toLowerCase()
-
-  if (lower.includes('youtube.com') || lower.includes('youtu.be')) {
-    return 'youtube'
-  }
-
-  if (lower.includes('soundcloud.com')) {
-    return 'soundcloud'
-  }
-
-  return null
-}
-
-function buildYoutubeEmbed(url: string, autoplay: boolean): string | null {
-  const videoId = extractYoutubeId(url)
-  if (!videoId) {
-    return null
-  }
-
-  return `https://www.youtube.com/embed/${videoId}?autoplay=${autoplay ? 1 : 0}&playsinline=1&rel=0`
-}
-
-function buildSoundcloudEmbed(url: string, autoplay: boolean): string {
-  const encoded = encodeURIComponent(url)
-  return `https://w.soundcloud.com/player/?url=${encoded}&auto_play=${autoplay ? 'true' : 'false'}&hide_related=true&show_comments=false&show_user=true&show_reposts=false&visual=true`
-}
-
 function formatTime(seconds: number): string {
-  if (!Number.isFinite(seconds) || seconds < 0) {
+  if (!Number.isFinite(seconds) || seconds <= 0) {
     return '0:00'
   }
 
@@ -129,60 +70,34 @@ function toRpcStatusText(status: {
 }
 
 function App(): React.JSX.Element {
-  const [tracks, setTracks] = useState<Track[]>(starterTracks)
-  const [currentIndex, setCurrentIndex] = useState(0)
-  const [isPlaying, setIsPlaying] = useState(true)
-  const [urlInput, setUrlInput] = useState('')
-  const [titleInput, setTitleInput] = useState('')
-  const [artistInput, setArtistInput] = useState('')
-  const [message, setMessage] = useState('Streaming from YouTube, SoundCloud, and local files.')
+  const [tracks, setTracks] = useState<Track[]>([])
+  const [currentIndex, setCurrentIndex] = useState(-1)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [currentAudioSrc, setCurrentAudioSrc] = useState('')
   const [progressSeconds, setProgressSeconds] = useState(0)
   const [durationSeconds, setDurationSeconds] = useState(0)
-  const [embedRefreshNonce, setEmbedRefreshNonce] = useState(0)
+  const [message, setMessage] = useState('Search for songs and add them to queue.')
+
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<Track[]>([])
+  const [searching, setSearching] = useState(false)
+
   const [rpcClientId, setRpcClientId] = useState(
     () => envDiscordClientId || localStorage.getItem('gita.discordClientId') || ''
   )
   const [rpcStatusText, setRpcStatusText] = useState('Discord RPC not configured')
 
   const audioRef = useRef<HTMLAudioElement | null>(null)
-  const tracksRef = useRef<Track[]>(starterTracks)
+  const currentTrackIdRef = useRef<string>('')
   const initialRpcClientIdRef = useRef(rpcClientId)
+  const tracksRef = useRef<Track[]>([])
 
-  const currentTrack = tracks[currentIndex] ?? null
-
-  const embedUrl = useMemo(() => {
-    if (!currentTrack) {
-      return null
-    }
-
-    if (currentTrack.source === 'youtube') {
-      return buildYoutubeEmbed(currentTrack.url, isPlaying)
-    }
-
-    if (currentTrack.source === 'soundcloud') {
-      return buildSoundcloudEmbed(currentTrack.url, isPlaying)
-    }
-
-    return null
-  }, [currentTrack, embedRefreshNonce, isPlaying])
+  const currentTrack = currentIndex >= 0 ? tracks[currentIndex] ?? null : null
+  const canSeek = currentTrack?.source === 'local'
 
   useEffect(() => {
     tracksRef.current = tracks
   }, [tracks])
-
-  const supportsNativeControls = currentTrack?.source === 'local'
-
-  useEffect(() => {
-    if (!currentTrack || currentTrack.source !== 'local' || !audioRef.current) {
-      return
-    }
-
-    if (isPlaying) {
-      void audioRef.current.play()
-    } else {
-      audioRef.current.pause()
-    }
-  }, [currentTrack, isPlaying])
 
   useEffect(() => {
     const initialRpcClientId = initialRpcClientIdRef.current
@@ -219,13 +134,6 @@ function App(): React.JSX.Element {
     }
   }, [])
 
-  const activateTrack = (nextIndex: number): void => {
-    setCurrentIndex(nextIndex)
-    setProgressSeconds(0)
-    setDurationSeconds(0)
-    setIsPlaying(true)
-  }
-
   useEffect(() => {
     if (!currentTrack) {
       void window.api.rpcClearPresence()
@@ -240,6 +148,7 @@ function App(): React.JSX.Element {
 
     let startTimestamp: number | undefined
     let endTimestamp: number | undefined
+
     if (isPlaying && durationSeconds > 0) {
       startTimestamp = Math.floor(Date.now() / 1000) - Math.floor(progressSeconds)
       endTimestamp = startTimestamp + Math.floor(durationSeconds)
@@ -260,6 +169,20 @@ function App(): React.JSX.Element {
   }, [currentTrack, durationSeconds, isPlaying, progressSeconds])
 
   useEffect(() => {
+    if (!audioRef.current || !currentTrack) {
+      return
+    }
+
+    if (isPlaying) {
+      void audioRef.current.play().catch(() => {
+        setIsPlaying(false)
+      })
+    } else {
+      audioRef.current.pause()
+    }
+  }, [currentAudioSrc, currentTrack, isPlaying])
+
+  useEffect(() => {
     return () => {
       tracksRef.current.forEach((track) => {
         if (track.localObjectUrl) {
@@ -271,39 +194,110 @@ function App(): React.JSX.Element {
     }
   }, [])
 
-  const addStream = (): void => {
-    const cleanedUrl = urlInput.trim()
-    if (!cleanedUrl) {
-      setMessage('Paste a YouTube or SoundCloud URL first.')
+  const loadTrackAudio = async (track: Track, seek = 0): Promise<void> => {
+    currentTrackIdRef.current = track.id
+
+    if (track.source === 'local') {
+      setCurrentAudioSrc(track.url)
+      setDurationSeconds(track.durationSec || 0)
+      if (seek > 0 && audioRef.current) {
+        audioRef.current.currentTime = seek
+      }
       return
     }
 
-    const source = detectSource(cleanedUrl)
-    if (!source) {
-      setMessage('Only YouTube and SoundCloud links are supported for URL streaming.')
+    const playback = await window.api.musicGetPlaybackUrl({
+      source: track.source,
+      url: track.url,
+      seek
+    })
+
+    if (currentTrackIdRef.current !== track.id) {
       return
     }
 
-    if (source === 'youtube' && !extractYoutubeId(cleanedUrl)) {
-      setMessage('That YouTube URL format is not supported. Use a standard watch/share URL.')
+    setCurrentAudioSrc(playback.playbackUrl)
+    setDurationSeconds(track.durationSec || 0)
+  }
+
+  const activateTrack = (nextIndex: number): void => {
+    const selectedTrack = tracks[nextIndex]
+    if (!selectedTrack) {
       return
     }
 
-    const newTrack: Track = {
-      id: crypto.randomUUID(),
-      title: titleInput.trim() || `${sourceLabel[source]} Stream`,
-      artist: artistInput.trim() || 'Unknown Artist',
-      source,
-      url: cleanedUrl
+    setCurrentIndex(nextIndex)
+    setProgressSeconds(0)
+    setDurationSeconds(selectedTrack.durationSec || 0)
+    setIsPlaying(true)
+
+    void loadTrackAudio(selectedTrack).catch((error: Error) => {
+      setMessage(`Failed to load track: ${error.message}`)
+      setIsPlaying(false)
+    })
+  }
+
+  const onSearch = (): void => {
+    const query = searchQuery.trim()
+    if (!query) {
+      return
     }
 
-    const nextIndex = tracks.length
-    setTracks((prev) => [...prev, newTrack])
-    activateTrack(nextIndex)
-    setUrlInput('')
-    setTitleInput('')
-    setArtistInput('')
-    setMessage(`${sourceLabel[source]} stream added to queue.`)
+    setSearching(true)
+    setMessage(`Searching for "${query}"...`)
+
+    void window.api
+      .musicSearch(query)
+      .then((results) => {
+        const mapped: Track[] = results.map((item) => ({
+          id: item.id,
+          source: item.source,
+          url: item.url,
+          title: item.title,
+          artist: item.artist,
+          durationSec: item.durationSec,
+          thumbnail: item.thumbnail
+        }))
+
+        setSearchResults(mapped)
+        setMessage(mapped.length ? `Found ${mapped.length} results.` : 'No tracks found.')
+      })
+      .catch((error: Error) => {
+        setMessage(`Search failed: ${error.message}`)
+      })
+      .finally(() => {
+        setSearching(false)
+      })
+  }
+
+  const onSearchKeyDown = (event: KeyboardEvent<HTMLInputElement>): void => {
+    if (event.key === 'Enter') {
+      onSearch()
+    }
+  }
+
+  const addResultToQueue = (result: Track, playNow: boolean): void => {
+    setTracks((prev) => {
+      const exists = prev.some((track) => track.id === result.id)
+      if (exists) {
+        const existingIndex = prev.findIndex((track) => track.id === result.id)
+        if (playNow && existingIndex >= 0) {
+          window.setTimeout(() => activateTrack(existingIndex), 0)
+        }
+
+        return prev
+      }
+
+      const next = [...prev, result]
+      const nextIndex = next.length - 1
+      if (playNow) {
+        window.setTimeout(() => activateTrack(nextIndex), 0)
+      }
+
+      return next
+    })
+
+    setMessage(playNow ? `${result.title} added and playing.` : `${result.title} added to queue.`)
   }
 
   const addLocalFiles = (event: ChangeEvent<HTMLInputElement>): void => {
@@ -312,24 +306,28 @@ function App(): React.JSX.Element {
       return
     }
 
-    const newTracks: Track[] = files.map((file) => {
+    const localTracks: Track[] = files.map((file) => {
       const objectUrl = URL.createObjectURL(file)
 
       return {
         id: crypto.randomUUID(),
-        title: file.name.replace(/\.[a-zA-Z0-9]+$/, ''),
-        artist: 'Local Library',
         source: 'local',
         url: objectUrl,
+        title: file.name.replace(/\.[a-zA-Z0-9]+$/, ''),
+        artist: 'Local Library',
+        durationSec: 0,
         localObjectUrl: objectUrl
       }
     })
 
     const startIndex = tracks.length
-    setTracks((prev) => [...prev, ...newTracks])
-    activateTrack(startIndex)
-    setMessage(`${newTracks.length} local track${newTracks.length > 1 ? 's' : ''} added.`)
+    setTracks((prev) => [...prev, ...localTracks])
+    setMessage(`${localTracks.length} local track${localTracks.length > 1 ? 's' : ''} added.`)
     event.target.value = ''
+
+    if (currentIndex < 0) {
+      window.setTimeout(() => activateTrack(startIndex), 0)
+    }
   }
 
   const togglePlayback = (): void => {
@@ -337,16 +335,7 @@ function App(): React.JSX.Element {
       return
     }
 
-    if (currentTrack.source === 'local') {
-      setIsPlaying((prev) => !prev)
-      return
-    }
-
-    setIsPlaying(true)
-    setEmbedRefreshNonce((prev) => prev + 1)
-    setMessage(
-      'YouTube and SoundCloud run inside embeds. Use controls in the player frame for pause/seek.'
-    )
+    setIsPlaying((prev) => !prev)
   }
 
   const goNext = (): void => {
@@ -354,7 +343,8 @@ function App(): React.JSX.Element {
       return
     }
 
-    activateTrack((currentIndex + 1) % tracks.length)
+    const nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % tracks.length
+    activateTrack(nextIndex)
   }
 
   const goPrev = (): void => {
@@ -362,14 +352,24 @@ function App(): React.JSX.Element {
       return
     }
 
-    activateTrack((currentIndex - 1 + tracks.length) % tracks.length)
+    const nextIndex = currentIndex < 0 ? 0 : (currentIndex - 1 + tracks.length) % tracks.length
+    activateTrack(nextIndex)
   }
 
-  const seekLocalTrack = (nextValue: number): void => {
-    if (currentTrack?.source === 'local' && audioRef.current) {
-      audioRef.current.currentTime = nextValue
+  const seekTrack = (nextValue: number): void => {
+    if (!currentTrack) {
+      return
     }
-    setProgressSeconds(nextValue)
+
+    if (audioRef.current && currentTrack.source === 'local') {
+      if (audioRef.current) {
+        audioRef.current.currentTime = nextValue
+      }
+      setProgressSeconds(nextValue)
+      return
+    }
+
+    setMessage('Seek is currently available for local tracks.')
   }
 
   const saveDiscordClientId = (): void => {
@@ -414,30 +414,43 @@ function App(): React.JSX.Element {
       })
   }
 
+  const activeInitial = useMemo(() => {
+    return currentTrack?.title?.charAt(0).toUpperCase() || 'G'
+  }, [currentTrack])
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
         <h1>Gita</h1>
-        <p className="sidebar-subtitle">Apple Music-inspired streaming</p>
+        <p className="sidebar-subtitle">Apple Music-inspired desktop player</p>
 
         <div className="panel">
-          <h2>Add Stream URL</h2>
+          <h2>Search Songs</h2>
           <input
-            value={urlInput}
-            onChange={(event) => setUrlInput(event.target.value)}
-            placeholder="YouTube or SoundCloud URL"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            onKeyDown={onSearchKeyDown}
+            placeholder="Search YouTube + SoundCloud"
           />
-          <input
-            value={titleInput}
-            onChange={(event) => setTitleInput(event.target.value)}
-            placeholder="Track title (optional)"
-          />
-          <input
-            value={artistInput}
-            onChange={(event) => setArtistInput(event.target.value)}
-            placeholder="Artist (optional)"
-          />
-          <button onClick={addStream}>Add Stream</button>
+          <button onClick={onSearch} disabled={searching}>
+            {searching ? 'Searching...' : 'Search'}
+          </button>
+          <ul className="search-results">
+            {searchResults.map((result) => (
+              <li key={result.id} className="search-item">
+                <div>
+                  <p className="queue-title">{result.title}</p>
+                  <p className="queue-artist">
+                    {result.artist} • {formatTime(result.durationSec)}
+                  </p>
+                </div>
+                <div className="search-actions">
+                  <button onClick={() => addResultToQueue(result, true)}>Play</button>
+                  <button onClick={() => addResultToQueue(result, false)}>Add</button>
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
 
         <div className="panel">
@@ -453,7 +466,7 @@ function App(): React.JSX.Element {
           <input
             value={rpcClientId}
             onChange={(event) => setRpcClientId(event.target.value)}
-            placeholder="Discord Client ID (env: DISCORD_CLIENT_ID / MAIN_VITE_DISCORD_CLIENT_ID)"
+            placeholder="Discord Client ID"
           />
           <button onClick={saveDiscordClientId}>Save RPC Client ID</button>
           <button onClick={sendTestRpc}>Test RPC</button>
@@ -463,11 +476,11 @@ function App(): React.JSX.Element {
 
       <main className="main-content">
         <section className="hero">
-          <div className="cover-art">{currentTrack?.title.slice(0, 1).toUpperCase() || 'G'}</div>
+          <div className="cover-art">{activeInitial}</div>
           <div>
             <p className="eyebrow">Now Playing</p>
             <h2>{currentTrack?.title || 'No track selected'}</h2>
-            <p className="artist-line">{currentTrack?.artist || 'Select a track from queue'}</p>
+            <p className="artist-line">{currentTrack?.artist || 'Search and play a song'}</p>
             <p className={currentTrack ? SOURCE_STYLES[currentTrack.source] : 'source-chip'}>
               {currentTrack ? sourceLabel[currentTrack.source] : 'No Source'}
             </p>
@@ -475,9 +488,26 @@ function App(): React.JSX.Element {
         </section>
 
         <section className="player-card">
+          <audio
+            ref={audioRef}
+            src={currentAudioSrc || undefined}
+            preload="auto"
+            onLoadedMetadata={(event) => {
+              if (event.currentTarget.duration > 0) {
+                setDurationSeconds(event.currentTarget.duration)
+              }
+            }}
+            onTimeUpdate={(event) => {
+              setProgressSeconds(event.currentTarget.currentTime)
+            }}
+            onEnded={goNext}
+          />
+
           <div className="transport">
             <button onClick={goPrev}>Prev</button>
-            <button onClick={togglePlayback}>{isPlaying ? 'Pause' : 'Play'}</button>
+            <button onClick={togglePlayback} disabled={!currentTrack}>
+              {isPlaying ? 'Pause' : 'Play'}
+            </button>
             <button onClick={goNext}>Next</button>
           </div>
 
@@ -488,39 +518,14 @@ function App(): React.JSX.Element {
               min={0}
               max={durationSeconds || 0}
               step={1}
-              disabled={!supportsNativeControls || !durationSeconds}
+              disabled={!canSeek || durationSeconds <= 0}
               value={Math.min(progressSeconds, durationSeconds || 0)}
-              onChange={(event) => seekLocalTrack(Number(event.target.value))}
+              onChange={(event) => seekTrack(Number(event.target.value))}
             />
             <span>{formatTime(durationSeconds)}</span>
           </div>
 
-          <p className="hint">
-            {supportsNativeControls
-              ? 'Transport controls are fully synced for local playback.'
-              : 'For YouTube/SoundCloud, use controls inside the embedded player.'}
-          </p>
-
-          {currentTrack?.source === 'local' && (
-            <audio
-              ref={audioRef}
-              src={currentTrack.url}
-              onLoadedMetadata={(event) => setDurationSeconds(event.currentTarget.duration)}
-              onTimeUpdate={(event) => setProgressSeconds(event.currentTarget.currentTime)}
-              onEnded={goNext}
-            />
-          )}
-
-          {currentTrack && currentTrack.source !== 'local' && embedUrl && (
-            <iframe
-              key={`${currentTrack.id}-${embedRefreshNonce}-${isPlaying ? 'play' : 'pause'}`}
-              className="embed-player"
-              src={embedUrl}
-              allow="autoplay; encrypted-media; picture-in-picture"
-              allowFullScreen
-              title={`${currentTrack.title} player`}
-            />
-          )}
+          <p className="hint">Native playback with full transport controls. Seeking is enabled for local tracks.</p>
         </section>
       </main>
 
@@ -536,7 +541,9 @@ function App(): React.JSX.Element {
             >
               <div>
                 <p className="queue-title">{track.title}</p>
-                <p className="queue-artist">{track.artist}</p>
+                <p className="queue-artist">
+                  {track.artist} • {formatTime(track.durationSec)}
+                </p>
               </div>
               <span className={SOURCE_STYLES[track.source]}>{sourceLabel[track.source]}</span>
             </li>
