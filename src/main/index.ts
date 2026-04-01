@@ -1,13 +1,60 @@
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { existsSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import { DiscordRpcBridge, type RpcPresence } from './discordRpc'
+
+const rpc = new DiscordRpcBridge()
+
+function readClientIdFromDotEnv(): string {
+  const envFiles = [join(process.cwd(), '.env.local'), join(process.cwd(), '.env')]
+
+  for (const filePath of envFiles) {
+    if (!existsSync(filePath)) {
+      continue
+    }
+
+    const lines = readFileSync(filePath, 'utf8').split(/\r?\n/)
+    for (const line of lines) {
+      const trimmed = line.trim()
+      if (!trimmed || trimmed.startsWith('#')) {
+        continue
+      }
+
+      const [rawKey, ...rawValueParts] = trimmed.split('=')
+      if (!rawKey || rawValueParts.length === 0) {
+        continue
+      }
+
+      const key = rawKey.trim()
+      if (
+        key !== 'DISCORD_CLIENT_ID' &&
+        key !== 'MAIN_VITE_DISCORD_CLIENT_ID' &&
+        key !== 'VITE_DISCORD_CLIENT_ID'
+      ) {
+        continue
+      }
+
+      const value = rawValueParts
+        .join('=')
+        .trim()
+        .replace(/^['"]|['"]$/g, '')
+      if (value) {
+        return value
+      }
+    }
+  }
+
+  return ''
+}
 
 function createWindow(): void {
-  // Create the browser window.
   const mainWindow = new BrowserWindow({
-    width: 900,
-    height: 670,
+    width: 1320,
+    height: 860,
+    minWidth: 1060,
+    minHeight: 700,
     show: false,
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
@@ -26,8 +73,6 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 
-  // HMR for renderer base on electron-vite cli.
-  // Load the remote URL for development or the local html file for production.
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
@@ -35,40 +80,53 @@ function createWindow(): void {
   }
 }
 
-// This method will be called when Electron has finished
-// initialization and is ready to create browser windows.
-// Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
-  // Set app user model id for windows
-  electronApp.setAppUserModelId('com.electron')
+  electronApp.setAppUserModelId('com.gita.music')
 
-  // Default open or close DevTools by F12 in development
-  // and ignore CommandOrControl + R in production.
-  // see https://github.com/alex8088/electron-toolkit/tree/master/packages/utils
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  // IPC test
-  ipcMain.on('ping', () => console.log('pong'))
+  ipcMain.handle('rpc:set-client-id', async (_, clientId: string) => {
+    return rpc.setClientId(clientId)
+  })
+
+  ipcMain.handle('rpc:get-status', async () => {
+    return rpc.probe()
+  })
+
+  ipcMain.handle('rpc:update-presence', async (_, payload: RpcPresence) => {
+    await rpc.updatePresence(payload)
+    return rpc.getStatus()
+  })
+
+  ipcMain.handle('rpc:clear-presence', async () => {
+    await rpc.clearPresence()
+    return rpc.getStatus()
+  })
+
+  const envClientId = (
+    process.env.DISCORD_CLIENT_ID ||
+    process.env.MAIN_VITE_DISCORD_CLIENT_ID ||
+    process.env.VITE_DISCORD_CLIENT_ID ||
+    readClientIdFromDotEnv() ||
+    ''
+  ).trim()
+  if (envClientId) {
+    void rpc.setClientId(envClientId)
+  }
 
   createWindow()
 
-  app.on('activate', function () {
-    // On macOS it's common to re-create a window in the app when the
-    // dock icon is clicked and there are no other windows open.
+  app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 })
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
 app.on('window-all-closed', () => {
+  rpc.disconnect()
+
   if (process.platform !== 'darwin') {
     app.quit()
   }
 })
-
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and require them here.
