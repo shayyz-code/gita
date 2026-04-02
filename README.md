@@ -16,6 +16,13 @@ Open-source music player with:
 - Local audio import and playback
 - Queue controls, playlists, favourites, and persistence
 
+## Screenshots
+
+<p align="center">
+  <img width="2640" height="1720" alt="screenshot-desktopapp" src="https://github.com/user-attachments/assets/071db84a-7188-47ea-9ad8-03cdf6b0c844" />
+  <img width="596" height="420" alt="screenshot-rpc" src="https://github.com/user-attachments/assets/87a521cd-0e0c-4cc3-8997-6625680deabd" />
+</p>
+
 ## Setup
 
 ```bash
