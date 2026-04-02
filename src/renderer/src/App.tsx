@@ -3,7 +3,6 @@ import { Navigate, Route, Routes, useNavigate } from 'react-router-dom'
 import SidebarNav from './components/SidebarNav'
 import PlayerCard from './components/PlayerCard'
 import QueuePanel from './components/QueuePanel'
-import { sourceLabel } from './lib/constants'
 import { formatTime } from './lib/format'
 import type { Playlist, Track, TrackLibrary } from './lib/types'
 import BrowsePage from './routes/BrowsePage'
@@ -168,10 +167,7 @@ function App(): React.JSX.Element {
     }
 
     const details = toPresenceText(currentTrack.title, 'Unknown Track')
-    const state = toPresenceText(
-      `${currentTrack.artist} • ${sourceLabel[currentTrack.source]}`,
-      'Listening'
-    )
+    const state = toPresenceText(currentTrack.artist, 'Listening')
 
     let startTimestamp: number | undefined
     let endTimestamp: number | undefined
@@ -185,7 +181,7 @@ function App(): React.JSX.Element {
       .rpcUpdatePresence({
         details,
         state,
-        largeImageText: `${sourceLabel[currentTrack.source]} • ${currentTrack.artist}`,
+        largeImageText: currentTrack.artist,
         smallImageText: isPlaying ? 'Playing' : 'Paused',
         startTimestamp,
         endTimestamp

@@ -1,5 +1,4 @@
 import { Heart, Pause, Play, SkipBack, SkipForward } from 'lucide-react'
-import { SOURCE_STYLES, sourceLabel } from '../lib/constants'
 import type { Playlist, Track } from '../lib/types'
 import MoreMenu from './MoreMenu'
 import TrackArtwork from './TrackArtwork'
@@ -79,9 +78,6 @@ function PlayerCard(props: PlayerCardProps): React.JSX.Element {
           <p className="artist-line">{currentTrack?.artist || 'Search and play a song'}</p>
         </div>
         <div className="now-playing-side">
-          <p className={currentTrack ? SOURCE_STYLES[currentTrack.source] : 'source-chip'}>
-            {currentTrack ? sourceLabel[currentTrack.source] : 'No Source'}
-          </p>
           {currentTrack ? (
             <div className="now-playing-actions">
               <button
