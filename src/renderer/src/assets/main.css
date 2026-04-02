@@ -500,6 +500,16 @@ button:disabled {
   font-size: 12px;
 }
 
+.playlist-link {
+  color: var(--sp-text);
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.playlist-link:hover {
+  text-decoration: underline;
+}
+
 .hero,
 .browse-panel,
 .player-card {

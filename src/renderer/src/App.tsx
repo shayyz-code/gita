@@ -60,7 +60,6 @@ function App(): React.JSX.Element {
   const [searching, setSearching] = useState(false)
 
   const [playlistDraftName, setPlaylistDraftName] = useState('')
-  const [selectedPlaylistId, setSelectedPlaylistId] = useState('')
   const [playlists, setPlaylists] = useState<Playlist[]>([])
   const [favouriteTrackIds, setFavouriteTrackIds] = useState<string[]>([])
   const [trackLibrary, setTrackLibrary] = useState<TrackLibrary>({})
@@ -93,19 +92,9 @@ function App(): React.JSX.Element {
 
   const currentTrack = currentIndex >= 0 ? (tracks[currentIndex] ?? null) : null
   const canSeek = currentTrack?.source === 'local'
-  const effectiveSelectedPlaylistId = playlists.some((playlist) => playlist.id === selectedPlaylistId)
-    ? selectedPlaylistId
-    : (playlists[0]?.id ?? '')
-  const selectedPlaylist =
-    playlists.find((playlist) => playlist.id === effectiveSelectedPlaylistId) || null
   const favouriteTracks = favouriteTrackIds
     .map((trackId) => resolveTrackById(trackId))
     .filter((track): track is Track => Boolean(track))
-  const selectedPlaylistTracks = selectedPlaylist
-    ? selectedPlaylist.trackIds
-        .map((trackId) => resolveTrackById(trackId))
-        .filter((track): track is Track => Boolean(track))
-    : []
 
   useEffect(() => {
     tracksRef.current = tracks
@@ -430,9 +419,9 @@ function App(): React.JSX.Element {
     }
 
     setPlaylists((prev) => [playlist, ...prev])
-    setSelectedPlaylistId(playlist.id)
     setPlaylistDraftName('')
     setMessage(`Playlist "${playlist.name}" created.`)
+    navigate(`/playlist/${playlist.id}`)
   }
 
   const deletePlaylist = (playlistId: string): void => {
@@ -675,18 +664,11 @@ function App(): React.JSX.Element {
               element={
                 <PlaylistsPage
                   playlists={playlists}
-                  selectedPlaylistId={effectiveSelectedPlaylistId}
-                  selectedPlaylistTracks={selectedPlaylistTracks}
                   playlistDraftName={playlistDraftName}
-                  formatTime={formatTime}
                   onDraftChange={setPlaylistDraftName}
                   onCreatePlaylist={createPlaylist}
-                  onSelectPlaylist={setSelectedPlaylistId}
                   onDeletePlaylist={deletePlaylist}
                   onTogglePinPlaylist={togglePinPlaylist}
-                  onPlayTrack={(track) => addTrackToQueue(track, true)}
-                  onQueueTrack={(track) => addTrackToQueue(track, false)}
-                  onRemoveTrack={removeTrackFromPlaylist}
                   onImportLocalFiles={addLocalFiles}
                 />
               }

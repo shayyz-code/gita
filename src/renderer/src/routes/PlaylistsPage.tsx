@@ -1,48 +1,32 @@
-import { ListPlus, Pin, Play, Plus, Trash2, Upload } from 'lucide-react'
-import type { Playlist, Track } from '../lib/types'
-import TrackArtwork from '../components/TrackArtwork'
+import { Pin, Plus, Trash2, Upload } from 'lucide-react'
+import { NavLink } from 'react-router-dom'
+import type { Playlist } from '../lib/types'
 
 type PlaylistsPageProps = {
   playlists: Playlist[]
-  selectedPlaylistId: string
-  selectedPlaylistTracks: Track[]
   playlistDraftName: string
-  formatTime: (seconds: number) => string
   onDraftChange: (value: string) => void
   onCreatePlaylist: () => void
-  onSelectPlaylist: (playlistId: string) => void
   onDeletePlaylist: (playlistId: string) => void
   onTogglePinPlaylist: (playlistId: string) => void
-  onPlayTrack: (track: Track) => void
-  onQueueTrack: (track: Track) => void
-  onRemoveTrack: (playlistId: string, trackId: string) => void
   onImportLocalFiles: (event: React.ChangeEvent<HTMLInputElement>) => void
 }
 
 function PlaylistsPage(props: PlaylistsPageProps): React.JSX.Element {
   const {
     playlists,
-    selectedPlaylistId,
-    selectedPlaylistTracks,
     playlistDraftName,
-    formatTime,
     onDraftChange,
     onCreatePlaylist,
-    onSelectPlaylist,
     onDeletePlaylist,
     onTogglePinPlaylist,
-    onPlayTrack,
-    onQueueTrack,
-    onRemoveTrack,
     onImportLocalFiles
   } = props
-
-  const selectedPlaylist = playlists.find((playlist) => playlist.id === selectedPlaylistId) || null
 
   return (
     <section className="content-panel">
       <h2>Playlists</h2>
-      <p className="content-subtitle">Create playlists and save tracks from search, queue, or now playing.</p>
+      <p className="content-subtitle">Create playlists and open them like albums.</p>
       <div className="inline-form">
         <input
           value={playlistDraftName}
@@ -67,75 +51,35 @@ function PlaylistsPage(props: PlaylistsPageProps): React.JSX.Element {
       </label>
 
       {playlists.length ? (
-        <>
-          <div className="playlist-tabs">
-            {playlists.map((playlist) => (
-              <button
-                key={playlist.id}
-                type="button"
-                className={selectedPlaylistId === playlist.id ? 'playlist-tab active' : 'playlist-tab'}
-                onClick={() => onSelectPlaylist(playlist.id)}
-              >
-                {playlist.pinned ? '📌 ' : ''}
-                {playlist.name}
-              </button>
-            ))}
-          </div>
-
-          {selectedPlaylist ? (
-            <>
-              <div className="playlist-toolbar">
-                <p className="content-subtitle">{selectedPlaylist.trackIds.length} track(s)</p>
+        <ul className="collection-list">
+          {playlists.map((playlist) => (
+            <li key={playlist.id} className="collection-item">
+              <div className="queue-art artwork-fallback">{playlist.name.charAt(0).toUpperCase()}</div>
+              <div>
+                <NavLink to={`/playlist/${playlist.id}`} className="playlist-link">
+                  {playlist.name}
+                </NavLink>
+                <p className="queue-artist">{playlist.trackIds.length} track(s)</p>
+              </div>
+              <div className="collection-actions">
                 <button
                   className="icon-only-btn"
-                  onClick={() => onTogglePinPlaylist(selectedPlaylist.id)}
-                  title={selectedPlaylist.pinned ? 'Unpin playlist' : 'Pin playlist'}
+                  onClick={() => onTogglePinPlaylist(playlist.id)}
+                  title={playlist.pinned ? 'Unpin playlist' : 'Pin playlist'}
                 >
                   <Pin className="icon" />
                 </button>
                 <button
                   className="icon-only-btn"
-                  onClick={() => onDeletePlaylist(selectedPlaylist.id)}
+                  onClick={() => onDeletePlaylist(playlist.id)}
                   title="Delete playlist"
                 >
                   <Trash2 className="icon" />
                 </button>
               </div>
-              <ul className="collection-list">
-                {selectedPlaylistTracks.length ? (
-                  selectedPlaylistTracks.map((track) => (
-                    <li key={`${selectedPlaylist.id}:${track.id}`} className="collection-item">
-                      <TrackArtwork track={track} className="queue-art" />
-                      <div>
-                        <p className="queue-title">{track.title}</p>
-                        <p className="queue-artist">
-                          {track.artist} • {formatTime(track.durationSec)}
-                        </p>
-                      </div>
-                      <div className="collection-actions">
-                        <button className="icon-only-btn" title="Play now" onClick={() => onPlayTrack(track)}>
-                          <Play className="icon" />
-                        </button>
-                        <button className="icon-only-btn" title="Add to queue" onClick={() => onQueueTrack(track)}>
-                          <ListPlus className="icon" />
-                        </button>
-                        <button
-                          className="icon-only-btn"
-                          title="Remove track"
-                          onClick={() => onRemoveTrack(selectedPlaylist.id, track.id)}
-                        >
-                          <Trash2 className="icon" />
-                        </button>
-                      </div>
-                    </li>
-                  ))
-                ) : (
-                  <li className="empty-state">This playlist is empty. Add tracks from browse or queue.</li>
-                )}
-              </ul>
-            </>
-          ) : null}
-        </>
+            </li>
+          ))}
+        </ul>
       ) : (
         <p className="empty-state">No playlists yet. Create your first playlist above.</p>
       )}
