@@ -149,6 +149,24 @@ a,
   letter-spacing: -0.03em;
 }
 
+.brand-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-logo {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  object-fit: cover;
+  box-shadow: 0 6px 14px rgba(4, 9, 22, 0.35);
+}
+
+.brand-title {
+  margin: 0;
+}
+
 .sidebar-subtitle {
   color: var(--sp-text-faint);
   margin-top: 6px;

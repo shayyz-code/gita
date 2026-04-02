@@ -2,6 +2,7 @@ import { Compass, Library, Settings, Star } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import { NAV_ITEMS } from '../lib/constants'
 import type { NavSection, Playlist } from '../lib/types'
+import gitaLogo from '../assets/gita.png'
 
 function navIcon(name: NavSection): React.JSX.Element {
   if (name === 'browse') return <Compass className="icon" />
@@ -19,7 +20,10 @@ function SidebarNav({ playlists }: SidebarNavProps): React.JSX.Element {
 
   return (
     <aside className="sidebar">
-      <h1>Gita</h1>
+      <div className="brand-row">
+        <img src={gitaLogo} alt="Gita logo" className="brand-logo" />
+        <h1 className="brand-title">Gita</h1>
+      </div>
       <p className="sidebar-subtitle">Music player by Shayy</p>
       <nav className="sidebar-nav">
         {NAV_ITEMS.map((item) => {
