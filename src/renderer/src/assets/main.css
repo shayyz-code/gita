@@ -150,16 +150,42 @@ a,
 .sidebar-nav {
   display: grid;
   gap: 6px;
+  margin-top: 12px;
 }
 
-.pinned-nav {
-  margin-top: 14px;
-  padding-top: 12px;
-  border-top: 1px solid var(--sp-border);
+.nav-group {
+  display: grid;
+  gap: 6px;
 }
 
-.pinned-label {
-  margin-bottom: 8px;
+.playlist-subnav {
+  display: grid;
+  gap: 4px;
+  margin-top: -2px;
+  padding-left: 22px;
+}
+
+.playlist-subnav-item {
+  display: block;
+  border-radius: 8px;
+  padding: 6px 10px;
+  color: var(--sp-text-faint);
+  text-decoration: none;
+  font-size: 12px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.playlist-subnav-item:hover {
+  background: #1d1f27;
+  color: var(--sp-text);
+}
+
+.playlist-subnav-item.active {
+  background: rgba(63, 71, 255, 0.2);
+  color: #dfe1ff;
 }
 
 .nav-item {

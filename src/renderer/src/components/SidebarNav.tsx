@@ -11,47 +11,63 @@ function navIcon(name: NavSection): React.JSX.Element {
 }
 
 type SidebarNavProps = {
-  pinnedPlaylists: Playlist[]
+  playlists: Playlist[]
 }
 
-function SidebarNav({ pinnedPlaylists }: SidebarNavProps): React.JSX.Element {
+function SidebarNav({ playlists }: SidebarNavProps): React.JSX.Element {
+  const playlistLinks = playlists.slice(0, 5)
+
   return (
     <aside className="sidebar">
       <h1>Gita</h1>
       <p className="sidebar-subtitle">Music player by Shayy</p>
       <nav className="sidebar-nav">
-        {NAV_ITEMS.map((item) => (
-          <NavLink
-            key={item.id}
-            to={`/${item.id}`}
-            className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}
-          >
-            <span className="btn-with-icon">
-              {navIcon(item.id)}
-              <span>{item.label}</span>
-            </span>
-          </NavLink>
-        ))}
-      </nav>
-      {pinnedPlaylists.length ? (
-        <div className="pinned-nav">
-          <p className="sidebar-subtitle pinned-label">Pinned Playlists</p>
-          <nav className="sidebar-nav">
-            {pinnedPlaylists.map((playlist) => (
+        {NAV_ITEMS.map((item) => {
+          if (item.id !== 'playlists') {
+            return (
               <NavLink
-                key={playlist.id}
-                to={`/playlist/${playlist.id}`}
+                key={item.id}
+                to={`/${item.id}`}
                 className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}
               >
                 <span className="btn-with-icon">
-                  <Library className="icon" />
-                  <span>{playlist.name}</span>
+                  {navIcon(item.id)}
+                  <span>{item.label}</span>
                 </span>
               </NavLink>
-            ))}
-          </nav>
-        </div>
-      ) : null}
+            )
+          }
+
+          return (
+            <div key={item.id} className="nav-group">
+              <NavLink
+                to={`/${item.id}`}
+                className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}
+              >
+                <span className="btn-with-icon">
+                  {navIcon(item.id)}
+                  <span>{item.label}</span>
+                </span>
+              </NavLink>
+              {playlistLinks.length ? (
+                <div className="playlist-subnav">
+                  {playlistLinks.map((playlist) => (
+                    <NavLink
+                      key={playlist.id}
+                      to={`/playlist/${playlist.id}`}
+                      className={({ isActive }) =>
+                        isActive ? 'playlist-subnav-item active' : 'playlist-subnav-item'
+                      }
+                    >
+                      {playlist.name}
+                    </NavLink>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          )
+        })}
+      </nav>
     </aside>
   )
 }

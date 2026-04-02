@@ -101,7 +101,6 @@ function App(): React.JSX.Element {
   const favouriteTracks = favouriteTrackIds
     .map((trackId) => resolveTrackById(trackId))
     .filter((track): track is Track => Boolean(track))
-  const pinnedPlaylists = playlists.filter((playlist) => Boolean(playlist.pinned))
   const selectedPlaylistTracks = selectedPlaylist
     ? selectedPlaylist.trackIds
         .map((trackId) => resolveTrackById(trackId))
@@ -645,7 +644,7 @@ function App(): React.JSX.Element {
     <div className="window-shell">
       <div className="window-drag-region" aria-hidden="true" />
       <div className="app-shell">
-        <SidebarNav pinnedPlaylists={pinnedPlaylists} />
+        <SidebarNav playlists={playlists} />
 
         <main className="main-content">
           <Routes>
