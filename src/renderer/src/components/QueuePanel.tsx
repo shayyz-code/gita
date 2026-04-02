@@ -75,7 +75,9 @@ function QueuePanel(props: QueuePanelProps): React.JSX.Element {
             </li>
           ))
         ) : (
-          <li className="empty-state">Your queue is empty. Add songs from search or local files.</li>
+          <li className="empty-state">
+            Your queue is empty. Add songs from search or local files.
+          </li>
         )}
       </ul>
     </aside>

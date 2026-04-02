@@ -178,7 +178,7 @@ a,
 .sidebar-nav {
   display: grid;
   gap: 8px;
-  margin-top: 4px;
+  margin-top: 12px;
   min-height: 0;
   overflow: auto;
 }
@@ -544,7 +544,6 @@ button:disabled {
 }
 
 .collection-item:hover {
-  transform: translateY(-1px);
   border-color: #46506a;
   background: linear-gradient(180deg, #1f2533, #1a202c);
 }
@@ -729,7 +728,6 @@ button:disabled {
 .search-item:hover {
   border-color: #4d5872;
   background: #1e2532;
-  transform: translateY(-1px);
 }
 
 .search-art,
@@ -940,7 +938,6 @@ button:disabled {
 
 .queue-item:hover {
   background: #212733;
-  transform: translateY(-1px);
 }
 
 .queue-item.active {
