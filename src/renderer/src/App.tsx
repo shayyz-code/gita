@@ -8,6 +8,7 @@ import { formatTime } from './lib/format'
 import type { Playlist, Track, TrackLibrary } from './lib/types'
 import BrowsePage from './routes/BrowsePage'
 import FavouritesPage from './routes/FavouritesPage'
+import PlaylistAlbumPage from './routes/PlaylistAlbumPage'
 import PlaylistsPage from './routes/PlaylistsPage'
 import SettingsPage from './routes/SettingsPage'
 
@@ -100,6 +101,7 @@ function App(): React.JSX.Element {
   const favouriteTracks = favouriteTrackIds
     .map((trackId) => resolveTrackById(trackId))
     .filter((track): track is Track => Boolean(track))
+  const pinnedPlaylists = playlists.filter((playlist) => Boolean(playlist.pinned))
   const selectedPlaylistTracks = selectedPlaylist
     ? selectedPlaylist.trackIds
         .map((trackId) => resolveTrackById(trackId))
@@ -424,7 +426,8 @@ function App(): React.JSX.Element {
     const playlist: Playlist = {
       id: crypto.randomUUID(),
       name,
-      trackIds: []
+      trackIds: [],
+      pinned: false
     }
 
     setPlaylists((prev) => [playlist, ...prev])
@@ -436,6 +439,28 @@ function App(): React.JSX.Element {
   const deletePlaylist = (playlistId: string): void => {
     setPlaylists((prev) => prev.filter((playlist) => playlist.id !== playlistId))
     setMessage('Playlist deleted.')
+  }
+
+  const togglePinPlaylist = (playlistId: string): void => {
+    let nextPinned = false
+    let playlistName = 'Playlist'
+
+    setPlaylists((prev) =>
+      prev.map((playlist) => {
+        if (playlist.id !== playlistId) {
+          return playlist
+        }
+
+        playlistName = playlist.name
+        nextPinned = !playlist.pinned
+        return {
+          ...playlist,
+          pinned: nextPinned
+        }
+      })
+    )
+
+    setMessage(nextPinned ? `"${playlistName}" pinned to sidebar.` : `"${playlistName}" unpinned.`)
   }
 
   const onSearch = (): void => {
@@ -620,7 +645,7 @@ function App(): React.JSX.Element {
     <div className="window-shell">
       <div className="window-drag-region" aria-hidden="true" />
       <div className="app-shell">
-        <SidebarNav />
+        <SidebarNav pinnedPlaylists={pinnedPlaylists} />
 
         <main className="main-content">
           <Routes>
@@ -659,10 +684,25 @@ function App(): React.JSX.Element {
                   onCreatePlaylist={createPlaylist}
                   onSelectPlaylist={setSelectedPlaylistId}
                   onDeletePlaylist={deletePlaylist}
+                  onTogglePinPlaylist={togglePinPlaylist}
                   onPlayTrack={(track) => addTrackToQueue(track, true)}
                   onQueueTrack={(track) => addTrackToQueue(track, false)}
                   onRemoveTrack={removeTrackFromPlaylist}
                   onImportLocalFiles={addLocalFiles}
+                />
+              }
+            />
+            <Route
+              path="/playlist/:playlistId"
+              element={
+                <PlaylistAlbumPage
+                  playlists={playlists}
+                  resolveTrackById={resolveTrackById}
+                  formatTime={formatTime}
+                  onPlayTrack={(track) => addTrackToQueue(track, true)}
+                  onQueueTrack={(track) => addTrackToQueue(track, false)}
+                  onRemoveTrack={removeTrackFromPlaylist}
+                  onTogglePinPlaylist={togglePinPlaylist}
                 />
               }
             />

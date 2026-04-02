@@ -1,7 +1,7 @@
 import { Compass, Library, Settings, Star } from 'lucide-react'
 import { NavLink } from 'react-router-dom'
 import { NAV_ITEMS } from '../lib/constants'
-import type { NavSection } from '../lib/types'
+import type { NavSection, Playlist } from '../lib/types'
 
 function navIcon(name: NavSection): React.JSX.Element {
   if (name === 'browse') return <Compass className="icon" />
@@ -10,7 +10,11 @@ function navIcon(name: NavSection): React.JSX.Element {
   return <Settings className="icon" />
 }
 
-function SidebarNav(): React.JSX.Element {
+type SidebarNavProps = {
+  pinnedPlaylists: Playlist[]
+}
+
+function SidebarNav({ pinnedPlaylists }: SidebarNavProps): React.JSX.Element {
   return (
     <aside className="sidebar">
       <h1>Gita</h1>
@@ -29,6 +33,25 @@ function SidebarNav(): React.JSX.Element {
           </NavLink>
         ))}
       </nav>
+      {pinnedPlaylists.length ? (
+        <div className="pinned-nav">
+          <p className="sidebar-subtitle pinned-label">Pinned Playlists</p>
+          <nav className="sidebar-nav">
+            {pinnedPlaylists.map((playlist) => (
+              <NavLink
+                key={playlist.id}
+                to={`/playlist/${playlist.id}`}
+                className={({ isActive }) => (isActive ? 'nav-item active' : 'nav-item')}
+              >
+                <span className="btn-with-icon">
+                  <Library className="icon" />
+                  <span>{playlist.name}</span>
+                </span>
+              </NavLink>
+            ))}
+          </nav>
+        </div>
+      ) : null}
     </aside>
   )
 }

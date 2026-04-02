@@ -54,7 +54,7 @@ type CollectionTrack = {
 }
 
 type CollectionState = {
-  playlists: Array<{ id: string; name: string; trackIds: string[] }>
+  playlists: Array<{ id: string; name: string; trackIds: string[]; pinned?: boolean }>
   favourites: string[]
   library: Record<string, CollectionTrack>
 }

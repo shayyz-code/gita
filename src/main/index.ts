@@ -21,7 +21,7 @@ type CollectionTrack = {
 }
 
 type CollectionState = {
-  playlists: Array<{ id: string; name: string; trackIds: string[] }>
+  playlists: Array<{ id: string; name: string; trackIds: string[]; pinned?: boolean }>
   favourites: string[]
   library: Record<string, CollectionTrack>
 }
@@ -40,7 +40,14 @@ function readCollectionState(): CollectionState {
   try {
     const parsed = JSON.parse(readFileSync(filePath, 'utf8')) as Partial<CollectionState>
     return {
-      playlists: Array.isArray(parsed.playlists) ? parsed.playlists : [],
+      playlists: Array.isArray(parsed.playlists)
+        ? parsed.playlists.map((playlist) => ({
+            id: playlist.id,
+            name: playlist.name,
+            trackIds: Array.isArray(playlist.trackIds) ? playlist.trackIds : [],
+            pinned: Boolean(playlist.pinned)
+          }))
+        : [],
       favourites: Array.isArray(parsed.favourites) ? parsed.favourites : [],
       library: parsed.library && typeof parsed.library === 'object' ? parsed.library : {}
     }

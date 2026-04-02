@@ -152,6 +152,16 @@ a,
   gap: 6px;
 }
 
+.pinned-nav {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--sp-border);
+}
+
+.pinned-label {
+  margin-bottom: 8px;
+}
+
 .nav-item {
   display: block;
   width: 100%;
@@ -338,6 +348,43 @@ button:disabled {
 .content-subtitle {
   color: var(--sp-text-muted);
   font-size: 13px;
+}
+
+.album-page {
+  gap: 14px;
+}
+
+.album-hero {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(180deg, #1f2030, #191a24);
+  border: 1px solid var(--sp-border-soft);
+}
+
+.album-cover {
+  width: 72px;
+  height: 72px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #5b62ff, #3f47ff);
+  display: grid;
+  place-items: center;
+  font-size: 30px;
+  font-weight: 800;
+  color: #f8f8ff;
+}
+
+.album-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.album-actions {
+  margin-top: 8px;
 }
 
 .inline-form {

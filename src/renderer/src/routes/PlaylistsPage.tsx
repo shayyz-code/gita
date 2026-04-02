@@ -1,4 +1,4 @@
-import { ListPlus, Play, Plus, Trash2, Upload } from 'lucide-react'
+import { ListPlus, Pin, Play, Plus, Trash2, Upload } from 'lucide-react'
 import type { Playlist, Track } from '../lib/types'
 import TrackArtwork from '../components/TrackArtwork'
 
@@ -12,6 +12,7 @@ type PlaylistsPageProps = {
   onCreatePlaylist: () => void
   onSelectPlaylist: (playlistId: string) => void
   onDeletePlaylist: (playlistId: string) => void
+  onTogglePinPlaylist: (playlistId: string) => void
   onPlayTrack: (track: Track) => void
   onQueueTrack: (track: Track) => void
   onRemoveTrack: (playlistId: string, trackId: string) => void
@@ -29,6 +30,7 @@ function PlaylistsPage(props: PlaylistsPageProps): React.JSX.Element {
     onCreatePlaylist,
     onSelectPlaylist,
     onDeletePlaylist,
+    onTogglePinPlaylist,
     onPlayTrack,
     onQueueTrack,
     onRemoveTrack,
@@ -74,6 +76,7 @@ function PlaylistsPage(props: PlaylistsPageProps): React.JSX.Element {
                 className={selectedPlaylistId === playlist.id ? 'playlist-tab active' : 'playlist-tab'}
                 onClick={() => onSelectPlaylist(playlist.id)}
               >
+                {playlist.pinned ? '📌 ' : ''}
                 {playlist.name}
               </button>
             ))}
@@ -83,6 +86,13 @@ function PlaylistsPage(props: PlaylistsPageProps): React.JSX.Element {
             <>
               <div className="playlist-toolbar">
                 <p className="content-subtitle">{selectedPlaylist.trackIds.length} track(s)</p>
+                <button
+                  className="icon-only-btn"
+                  onClick={() => onTogglePinPlaylist(selectedPlaylist.id)}
+                  title={selectedPlaylist.pinned ? 'Unpin playlist' : 'Pin playlist'}
+                >
+                  <Pin className="icon" />
+                </button>
                 <button
                   className="icon-only-btn"
                   onClick={() => onDeletePlaylist(selectedPlaylist.id)}
