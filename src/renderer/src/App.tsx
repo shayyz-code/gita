@@ -14,6 +14,18 @@ type Track = {
   localObjectUrl?: string
 }
 
+type Playlist = {
+  id: string
+  name: string
+  trackIds: string[]
+}
+
+type TrackLibrary = Record<string, Track>
+
+const PLAYLISTS_STORAGE_KEY = 'gita.playlists.v1'
+const FAVOURITES_STORAGE_KEY = 'gita.favourites.v1'
+const LIBRARY_STORAGE_KEY = 'gita.trackLibrary.v1'
+
 const sourceLabel: Record<SourceType, string> = {
   youtube: 'YouTube',
   soundcloud: 'SoundCloud',
@@ -34,6 +46,18 @@ const NAV_ITEMS: Array<{ id: NavSection; label: string }> = [
 ]
 
 const envDiscordClientId = (import.meta.env.VITE_DISCORD_CLIENT_ID || '').trim()
+
+function parseStorageJson<T>(raw: string | null, fallback: T): T {
+  if (!raw) {
+    return fallback
+  }
+
+  try {
+    return JSON.parse(raw) as T
+  } catch {
+    return fallback
+  }
+}
 
 function formatTime(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds <= 0) {
@@ -90,6 +114,17 @@ function App(): React.JSX.Element {
   const [searchResults, setSearchResults] = useState<Track[]>([])
   const [searching, setSearching] = useState(false)
   const [activeNav, setActiveNav] = useState<NavSection>('browse')
+  const [playlistDraftName, setPlaylistDraftName] = useState('')
+  const [selectedPlaylistId, setSelectedPlaylistId] = useState('')
+  const [playlists, setPlaylists] = useState<Playlist[]>(() =>
+    parseStorageJson<Playlist[]>(localStorage.getItem(PLAYLISTS_STORAGE_KEY), [])
+  )
+  const [favouriteTrackIds, setFavouriteTrackIds] = useState<string[]>(() =>
+    parseStorageJson<string[]>(localStorage.getItem(FAVOURITES_STORAGE_KEY), [])
+  )
+  const [trackLibrary, setTrackLibrary] = useState<TrackLibrary>(() =>
+    parseStorageJson<TrackLibrary>(localStorage.getItem(LIBRARY_STORAGE_KEY), {})
+  )
 
   const [rpcClientId, setRpcClientId] = useState(
     () => envDiscordClientId || localStorage.getItem('gita.discordClientId') || ''
@@ -104,10 +139,43 @@ function App(): React.JSX.Element {
 
   const currentTrack = currentIndex >= 0 ? (tracks[currentIndex] ?? null) : null
   const canSeek = currentTrack?.source === 'local'
+  const selectedPlaylist = playlists.find((playlist) => playlist.id === selectedPlaylistId) || null
+  const favouriteTracks = favouriteTrackIds
+    .map((trackId) => resolveTrackById(trackId))
+    .filter((track): track is Track => Boolean(track))
+  const selectedPlaylistTracks = selectedPlaylist
+    ? selectedPlaylist.trackIds
+        .map((trackId) => resolveTrackById(trackId))
+        .filter((track): track is Track => Boolean(track))
+    : []
 
   useEffect(() => {
     tracksRef.current = tracks
   }, [tracks])
+
+  useEffect(() => {
+    localStorage.setItem(PLAYLISTS_STORAGE_KEY, JSON.stringify(playlists))
+  }, [playlists])
+
+  useEffect(() => {
+    localStorage.setItem(FAVOURITES_STORAGE_KEY, JSON.stringify(favouriteTrackIds))
+  }, [favouriteTrackIds])
+
+  useEffect(() => {
+    localStorage.setItem(LIBRARY_STORAGE_KEY, JSON.stringify(trackLibrary))
+  }, [trackLibrary])
+
+  useEffect(() => {
+    if (!playlists.length) {
+      setSelectedPlaylistId('')
+      return
+    }
+
+    const selectedExists = playlists.some((playlist) => playlist.id === selectedPlaylistId)
+    if (!selectedExists) {
+      setSelectedPlaylistId(playlists[0].id)
+    }
+  }, [playlists, selectedPlaylistId])
 
   useEffect(() => {
     const initialRpcClientId = initialRpcClientIdRef.current
@@ -287,11 +355,47 @@ function App(): React.JSX.Element {
     }
   }
 
-  const addResultToQueue = (result: Track, playNow: boolean): void => {
+  const canPersistTrack = (track: Track): boolean => {
+    return track.source !== 'local' && Boolean(track.url)
+  }
+
+  const registerTrackInLibrary = (track: Track): void => {
+    if (!canPersistTrack(track)) {
+      return
+    }
+
+    setTrackLibrary((prev) => {
+      const existing = prev[track.id]
+      if (existing) {
+        return prev
+      }
+
+      return {
+        ...prev,
+        [track.id]: {
+          id: track.id,
+          source: track.source,
+          url: track.url,
+          title: track.title,
+          artist: track.artist,
+          durationSec: track.durationSec,
+          thumbnail: track.thumbnail
+        }
+      }
+    })
+  }
+
+  const isFavourite = (trackId: string): boolean => {
+    return favouriteTrackIds.includes(trackId)
+  }
+
+  const addTrackToQueue = (track: Track, playNow: boolean): void => {
+    registerTrackInLibrary(track)
+
     setTracks((prev) => {
-      const exists = prev.some((track) => track.id === result.id)
+      const exists = prev.some((item) => item.id === track.id)
       if (exists) {
-        const existingIndex = prev.findIndex((track) => track.id === result.id)
+        const existingIndex = prev.findIndex((item) => item.id === track.id)
         if (playNow && existingIndex >= 0) {
           window.setTimeout(() => activateTrack(existingIndex), 0)
         }
@@ -299,7 +403,7 @@ function App(): React.JSX.Element {
         return prev
       }
 
-      const next = [...prev, result]
+      const next = [...prev, track]
       const nextIndex = next.length - 1
       if (playNow) {
         window.setTimeout(() => activateTrack(nextIndex), 0)
@@ -308,7 +412,109 @@ function App(): React.JSX.Element {
       return next
     })
 
-    setMessage(playNow ? `${result.title} added and playing.` : `${result.title} added to queue.`)
+    setMessage(playNow ? `${track.title} added and playing.` : `${track.title} added to queue.`)
+  }
+
+  const toggleFavouriteTrack = (track: Track): void => {
+    if (!canPersistTrack(track)) {
+      setMessage('Only YouTube and SoundCloud tracks can be saved to favourites.')
+      return
+    }
+
+    registerTrackInLibrary(track)
+
+    setFavouriteTrackIds((prev) => {
+      const exists = prev.includes(track.id)
+      const next = exists ? prev.filter((id) => id !== track.id) : [...prev, track.id]
+      setMessage(exists ? `${track.title} removed from favourites.` : `${track.title} added to favourites.`)
+      return next
+    })
+  }
+
+  const createPlaylist = (): void => {
+    const name = playlistDraftName.trim()
+    if (!name) {
+      setMessage('Enter a playlist name first.')
+      return
+    }
+
+    const playlist: Playlist = {
+      id: crypto.randomUUID(),
+      name,
+      trackIds: []
+    }
+
+    setPlaylists((prev) => [playlist, ...prev])
+    setSelectedPlaylistId(playlist.id)
+    setPlaylistDraftName('')
+    setMessage(`Playlist "${playlist.name}" created.`)
+  }
+
+  const deletePlaylist = (playlistId: string): void => {
+    setPlaylists((prev) => prev.filter((playlist) => playlist.id !== playlistId))
+    setMessage('Playlist deleted.')
+  }
+
+  const addTrackToPlaylist = (playlistId: string, track: Track): void => {
+    if (!playlistId) {
+      setMessage('Select or create a playlist first.')
+      return
+    }
+
+    if (!canPersistTrack(track)) {
+      setMessage('Only YouTube and SoundCloud tracks can be saved in playlists.')
+      return
+    }
+
+    registerTrackInLibrary(track)
+
+    setPlaylists((prev) =>
+      prev.map((playlist) => {
+        if (playlist.id !== playlistId) {
+          return playlist
+        }
+
+        if (playlist.trackIds.includes(track.id)) {
+          return playlist
+        }
+
+        return {
+          ...playlist,
+          trackIds: [...playlist.trackIds, track.id]
+        }
+      })
+    )
+    setMessage(`Added "${track.title}" to playlist.`)
+  }
+
+  const removeTrackFromPlaylist = (playlistId: string, trackId: string): void => {
+    setPlaylists((prev) =>
+      prev.map((playlist) => {
+        if (playlist.id !== playlistId) {
+          return playlist
+        }
+
+        return {
+          ...playlist,
+          trackIds: playlist.trackIds.filter((id) => id !== trackId)
+        }
+      })
+    )
+    setMessage('Track removed from playlist.')
+  }
+
+  function resolveTrackById(trackId: string): Track | null {
+    const fromQueue = tracks.find((track) => track.id === trackId)
+    if (fromQueue) {
+      return fromQueue
+    }
+
+    const fromSearch = searchResults.find((track) => track.id === trackId)
+    if (fromSearch) {
+      return fromSearch
+    }
+
+    return trackLibrary[trackId] || null
   }
 
   const tryRecoverRemoteStream = (reason: string): void => {
@@ -515,8 +721,23 @@ function App(): React.JSX.Element {
                         </p>
                       </div>
                       <div className="search-actions">
-                        <button onClick={() => addResultToQueue(result, true)}>Play</button>
-                        <button onClick={() => addResultToQueue(result, false)}>Add</button>
+                        <button onClick={() => addTrackToQueue(result, true)}>Play</button>
+                        <button onClick={() => addTrackToQueue(result, false)}>Add</button>
+                        <button onClick={() => toggleFavouriteTrack(result)}>
+                          {isFavourite(result.id) ? 'Unfav' : 'Fav'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (!selectedPlaylistId) {
+                              setActiveNav('playlists')
+                              setMessage('Create a playlist first, then add tracks from search.')
+                              return
+                            }
+                            addTrackToPlaylist(selectedPlaylistId, result)
+                          }}
+                        >
+                          +PL
+                        </button>
                       </div>
                     </li>
                   ))
@@ -530,18 +751,105 @@ function App(): React.JSX.Element {
           {activeNav === 'playlists' && (
             <section className="content-panel">
               <h2>Playlists</h2>
-              <p className="content-subtitle">Import local tracks and manage your queue as a playlist.</p>
+              <p className="content-subtitle">Create playlists and save tracks from search, queue, or now playing.</p>
+              <div className="inline-form">
+                <input
+                  value={playlistDraftName}
+                  onChange={(event) => setPlaylistDraftName(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      createPlaylist()
+                    }
+                  }}
+                  placeholder="New playlist name"
+                />
+                <button onClick={createPlaylist}>Create</button>
+              </div>
               <label className="upload">
-                Import audio
+                Import local audio
                 <input type="file" accept="audio/*" multiple onChange={addLocalFiles} />
               </label>
+
+              {playlists.length ? (
+                <>
+                  <div className="playlist-tabs">
+                    {playlists.map((playlist) => (
+                      <button
+                        key={playlist.id}
+                        type="button"
+                        className={selectedPlaylistId === playlist.id ? 'playlist-tab active' : 'playlist-tab'}
+                        onClick={() => setSelectedPlaylistId(playlist.id)}
+                      >
+                        {playlist.name}
+                      </button>
+                    ))}
+                  </div>
+
+                  {selectedPlaylist ? (
+                    <>
+                      <div className="playlist-toolbar">
+                        <p className="content-subtitle">{selectedPlaylist.trackIds.length} track(s)</p>
+                        <button onClick={() => deletePlaylist(selectedPlaylist.id)}>Delete Playlist</button>
+                      </div>
+                      <ul className="collection-list">
+                        {selectedPlaylistTracks.length ? (
+                          selectedPlaylistTracks.map((track) => (
+                            <li key={`${selectedPlaylist.id}:${track.id}`} className="collection-item">
+                              {renderArtwork(track, 'queue-art')}
+                              <div>
+                                <p className="queue-title">{track.title}</p>
+                                <p className="queue-artist">
+                                  {track.artist} • {formatTime(track.durationSec)}
+                                </p>
+                              </div>
+                              <div className="collection-actions">
+                                <button onClick={() => addTrackToQueue(track, true)}>Play</button>
+                                <button onClick={() => addTrackToQueue(track, false)}>Queue</button>
+                                <button onClick={() => removeTrackFromPlaylist(selectedPlaylist.id, track.id)}>
+                                  Remove
+                                </button>
+                              </div>
+                            </li>
+                          ))
+                        ) : (
+                          <li className="empty-state">This playlist is empty. Add tracks from browse or queue.</li>
+                        )}
+                      </ul>
+                    </>
+                  ) : null}
+                </>
+              ) : (
+                <p className="empty-state">No playlists yet. Create your first playlist above.</p>
+              )}
             </section>
           )}
 
           {activeNav === 'favourites' && (
             <section className="content-panel">
               <h2>Favourites</h2>
-              <p className="content-subtitle">Pin and manage favourite tracks here.</p>
+              <p className="content-subtitle">Your saved tracks, synced from local storage.</p>
+              <ul className="collection-list">
+                {favouriteTracks.length ? (
+                  favouriteTracks.map((track) => (
+                    <li key={`fav:${track.id}`} className="collection-item">
+                      {renderArtwork(track, 'queue-art')}
+                      <div>
+                        <p className="queue-title">{track.title}</p>
+                        <p className="queue-artist">
+                          {track.artist} • {formatTime(track.durationSec)}
+                        </p>
+                      </div>
+                      <div className="collection-actions">
+                        <button onClick={() => addTrackToQueue(track, true)}>Play</button>
+                        <button onClick={() => addTrackToQueue(track, false)}>Queue</button>
+                        <button onClick={() => toggleFavouriteTrack(track)}>Remove</button>
+                      </div>
+                    </li>
+                  ))
+                ) : (
+                  <li className="empty-state">No favourites yet. Tap Fav on tracks in browse or queue.</li>
+                )}
+              </ul>
             </section>
           )}
 
@@ -594,9 +902,30 @@ function App(): React.JSX.Element {
                 <p className="now-playing-title">{currentTrack?.title || 'No track selected'}</p>
                 <p className="artist-line">{currentTrack?.artist || 'Search and play a song'}</p>
               </div>
-              <p className={currentTrack ? SOURCE_STYLES[currentTrack.source] : 'source-chip'}>
-                {currentTrack ? sourceLabel[currentTrack.source] : 'No Source'}
-              </p>
+              <div className="now-playing-side">
+                <p className={currentTrack ? SOURCE_STYLES[currentTrack.source] : 'source-chip'}>
+                  {currentTrack ? sourceLabel[currentTrack.source] : 'No Source'}
+                </p>
+                {currentTrack ? (
+                  <div className="now-playing-actions">
+                    <button onClick={() => toggleFavouriteTrack(currentTrack)}>
+                      {isFavourite(currentTrack.id) ? 'Unfav' : 'Fav'}
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (!selectedPlaylistId) {
+                          setActiveNav('playlists')
+                          setMessage('Create a playlist first, then add this track.')
+                          return
+                        }
+                        addTrackToPlaylist(selectedPlaylistId, currentTrack)
+                      }}
+                    >
+                      +Playlist
+                    </button>
+                  </div>
+                ) : null}
+              </div>
             </div>
 
             <div className="transport">
@@ -645,7 +974,32 @@ function App(): React.JSX.Element {
                       {track.artist} • {formatTime(track.durationSec)}
                     </p>
                   </div>
-                  <span className={SOURCE_STYLES[track.source]}>{sourceLabel[track.source]}</span>
+                  <div className="queue-item-side">
+                    <span className={SOURCE_STYLES[track.source]}>{sourceLabel[track.source]}</span>
+                    <div className="queue-mini-actions">
+                      <button
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          toggleFavouriteTrack(track)
+                        }}
+                      >
+                        {isFavourite(track.id) ? 'Unfav' : 'Fav'}
+                      </button>
+                      <button
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          if (!selectedPlaylistId) {
+                            setActiveNav('playlists')
+                            setMessage('Create a playlist first, then add tracks from queue.')
+                            return
+                          }
+                          addTrackToPlaylist(selectedPlaylistId, track)
+                        }}
+                      >
+                        +PL
+                      </button>
+                    </div>
+                  </div>
                 </li>
               ))
             ) : (
