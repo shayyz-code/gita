@@ -1,4 +1,5 @@
-import { ListPlus, Pin, Play, Trash2 } from 'lucide-react'
+import { Check, ListPlus, Pencil, Pin, Play, Trash2, X } from 'lucide-react'
+import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import TrackArtwork from '../components/TrackArtwork'
 import type { Playlist, Track } from '../lib/types'
@@ -10,6 +11,7 @@ type PlaylistAlbumPageProps = {
   onPlayTrack: (track: Track) => void
   onQueueTrack: (track: Track) => void
   onRemoveTrack: (playlistId: string, trackId: string) => void
+  onRenamePlaylist: (playlistId: string, nextName: string) => void
   onTogglePinPlaylist: (playlistId: string) => void
 }
 
@@ -21,9 +23,12 @@ function PlaylistAlbumPage(props: PlaylistAlbumPageProps): React.JSX.Element {
     onPlayTrack,
     onQueueTrack,
     onRemoveTrack,
+    onRenamePlaylist,
     onTogglePinPlaylist
   } = props
   const { playlistId = '' } = useParams()
+  const [isRenaming, setIsRenaming] = useState(false)
+  const [renameDraft, setRenameDraft] = useState('')
 
   const playlist = playlists.find((item) => item.id === playlistId) || null
   const tracks = playlist
@@ -41,15 +46,61 @@ function PlaylistAlbumPage(props: PlaylistAlbumPageProps): React.JSX.Element {
     )
   }
 
+  const beginRename = (): void => {
+    setRenameDraft(playlist.name)
+    setIsRenaming(true)
+  }
+
+  const cancelRename = (): void => {
+    setIsRenaming(false)
+    setRenameDraft('')
+  }
+
+  const submitRename = (): void => {
+    onRenamePlaylist(playlist.id, renameDraft)
+    cancelRename()
+  }
+
   return (
     <section className="content-panel album-page">
       <div className="album-hero">
         <div className="album-cover">{playlist.name.charAt(0).toUpperCase()}</div>
         <div>
           <p className="eyebrow">Playlist</p>
-          <h2 className="album-title">{playlist.name}</h2>
+          {isRenaming ? (
+            <input
+              className="playlist-rename-input album-title-edit"
+              value={renameDraft}
+              onChange={(event) => setRenameDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  submitRename()
+                }
+                if (event.key === 'Escape') {
+                  cancelRename()
+                }
+              }}
+              autoFocus
+            />
+          ) : (
+            <h2 className="album-title">{playlist.name}</h2>
+          )}
           <p className="content-subtitle">{playlist.trackIds.length} track(s)</p>
           <div className="album-actions">
+            {isRenaming ? (
+              <>
+                <button className="icon-only-btn" title="Save name" onClick={submitRename}>
+                  <Check className="icon" />
+                </button>
+                <button className="icon-only-btn" title="Cancel rename" onClick={cancelRename}>
+                  <X className="icon" />
+                </button>
+              </>
+            ) : (
+              <button className="icon-only-btn" title="Rename playlist" onClick={beginRename}>
+                <Pencil className="icon" />
+              </button>
+            )}
             <button
               className="icon-only-btn"
               title={playlist.pinned ? 'Unpin playlist' : 'Pin playlist'}

@@ -451,6 +451,13 @@ button:disabled {
 
 .album-actions {
   margin-top: 8px;
+  display: flex;
+  gap: 8px;
+}
+
+.album-title-edit {
+  width: min(360px, 100%);
+  margin-top: 2px;
 }
 
 .inline-form {
@@ -562,6 +569,23 @@ button:disabled {
 
 .playlist-link:hover {
   text-decoration: underline;
+}
+
+.playlist-rename-input {
+  width: 100%;
+  border: 1px solid #3a4560;
+  border-radius: 8px;
+  background: #111622;
+  color: var(--sp-text);
+  padding: 6px 8px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.playlist-rename-input:focus {
+  outline: none;
+  border-color: #6f75ff;
+  box-shadow: 0 0 0 2px rgba(63, 71, 255, 0.3);
 }
 
 .hero,

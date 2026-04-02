@@ -429,6 +429,42 @@ function App(): React.JSX.Element {
     setMessage('Playlist deleted.')
   }
 
+  const renamePlaylist = (playlistId: string, nextName: string): void => {
+    const trimmedName = nextName.trim()
+    if (!trimmedName) {
+      setMessage('Playlist name cannot be empty.')
+      return
+    }
+
+    let renamed = false
+    let previousName = ''
+
+    setPlaylists((prev) =>
+      prev.map((playlist) => {
+        if (playlist.id !== playlistId) {
+          return playlist
+        }
+
+        previousName = playlist.name
+        if (playlist.name === trimmedName) {
+          return playlist
+        }
+
+        renamed = true
+        return {
+          ...playlist,
+          name: trimmedName
+        }
+      })
+    )
+
+    if (renamed) {
+      setMessage(`Renamed "${previousName}" to "${trimmedName}".`)
+    } else {
+      setMessage('Playlist name unchanged.')
+    }
+  }
+
   const togglePinPlaylist = (playlistId: string): void => {
     let nextPinned = false
     let playlistName = 'Playlist'
@@ -668,6 +704,7 @@ function App(): React.JSX.Element {
                   onDraftChange={setPlaylistDraftName}
                   onCreatePlaylist={createPlaylist}
                   onDeletePlaylist={deletePlaylist}
+                  onRenamePlaylist={renamePlaylist}
                   onTogglePinPlaylist={togglePinPlaylist}
                   onImportLocalFiles={addLocalFiles}
                 />
@@ -683,6 +720,7 @@ function App(): React.JSX.Element {
                   onPlayTrack={(track) => addTrackToQueue(track, true)}
                   onQueueTrack={(track) => addTrackToQueue(track, false)}
                   onRemoveTrack={removeTrackFromPlaylist}
+                  onRenamePlaylist={renamePlaylist}
                   onTogglePinPlaylist={togglePinPlaylist}
                 />
               }

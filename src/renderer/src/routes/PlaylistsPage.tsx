@@ -1,4 +1,5 @@
-import { Pin, Plus, Trash2, Upload } from 'lucide-react'
+import { Check, Pencil, Pin, Plus, Trash2, Upload, X } from 'lucide-react'
+import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import type { Playlist } from '../lib/types'
 
@@ -8,6 +9,7 @@ type PlaylistsPageProps = {
   onDraftChange: (value: string) => void
   onCreatePlaylist: () => void
   onDeletePlaylist: (playlistId: string) => void
+  onRenamePlaylist: (playlistId: string, nextName: string) => void
   onTogglePinPlaylist: (playlistId: string) => void
   onImportLocalFiles: (event: React.ChangeEvent<HTMLInputElement>) => void
 }
@@ -19,9 +21,32 @@ function PlaylistsPage(props: PlaylistsPageProps): React.JSX.Element {
     onDraftChange,
     onCreatePlaylist,
     onDeletePlaylist,
+    onRenamePlaylist,
     onTogglePinPlaylist,
     onImportLocalFiles
   } = props
+
+  const [editingPlaylistId, setEditingPlaylistId] = useState('')
+  const [renameDraft, setRenameDraft] = useState('')
+
+  const beginRename = (playlist: Playlist): void => {
+    setEditingPlaylistId(playlist.id)
+    setRenameDraft(playlist.name)
+  }
+
+  const cancelRename = (): void => {
+    setEditingPlaylistId('')
+    setRenameDraft('')
+  }
+
+  const submitRename = (): void => {
+    if (!editingPlaylistId) {
+      return
+    }
+
+    onRenamePlaylist(editingPlaylistId, renameDraft)
+    cancelRename()
+  }
 
   return (
     <section className="content-panel">
@@ -56,12 +81,47 @@ function PlaylistsPage(props: PlaylistsPageProps): React.JSX.Element {
             <li key={playlist.id} className="collection-item">
               <div className="queue-art artwork-fallback">{playlist.name.charAt(0).toUpperCase()}</div>
               <div>
-                <NavLink to={`/playlist/${playlist.id}`} className="playlist-link">
-                  {playlist.name}
-                </NavLink>
+                {editingPlaylistId === playlist.id ? (
+                  <input
+                    className="playlist-rename-input"
+                    value={renameDraft}
+                    onChange={(event) => setRenameDraft(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        submitRename()
+                      }
+                      if (event.key === 'Escape') {
+                        cancelRename()
+                      }
+                    }}
+                    autoFocus
+                  />
+                ) : (
+                  <NavLink to={`/playlist/${playlist.id}`} className="playlist-link">
+                    {playlist.name}
+                  </NavLink>
+                )}
                 <p className="queue-artist">{playlist.trackIds.length} track(s)</p>
               </div>
               <div className="collection-actions">
+                {editingPlaylistId === playlist.id ? (
+                  <>
+                    <button className="icon-only-btn" onClick={submitRename} title="Save name">
+                      <Check className="icon" />
+                    </button>
+                    <button className="icon-only-btn" onClick={cancelRename} title="Cancel rename">
+                      <X className="icon" />
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    className="icon-only-btn"
+                    onClick={() => beginRename(playlist)}
+                    title="Rename playlist"
+                  >
+                    <Pencil className="icon" />
+                  </button>
+                )}
                 <button
                   className="icon-only-btn"
                   onClick={() => onTogglePinPlaylist(playlist.id)}
