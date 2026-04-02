@@ -153,6 +153,7 @@ a,
 }
 
 .nav-item {
+  display: block;
   width: 100%;
   text-align: left;
   border-radius: var(--radius-md);
@@ -162,6 +163,7 @@ a,
   padding: 10px 12px;
   font-weight: 600;
   box-shadow: none;
+  text-decoration: none;
 }
 
 .nav-item:hover {

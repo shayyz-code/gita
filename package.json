@@ -25,7 +25,8 @@
     "@electron-toolkit/utils": "^4.0.0",
     "electron-updater": "^6.3.9",
     "lucide-react": "^0.552.0",
-    "play-dl": "^1.9.7"
+    "play-dl": "^1.9.7",
+    "react-router-dom": "^7.13.2"
   },
   "devDependencies": {
     "@electron-toolkit/eslint-config-prettier": "^3.0.0",
