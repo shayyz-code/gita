@@ -1,4 +1,6 @@
 node_modules
+node-compile-cache
+.pnpm-store
 dist
 out
 .DS_Store

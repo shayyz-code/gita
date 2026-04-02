@@ -1,4 +1,23 @@
 import { ChangeEvent, KeyboardEvent, useEffect, useRef, useState } from 'react'
+import {
+  Compass,
+  FlaskConical,
+  Heart,
+  Library,
+  ListPlus,
+  MoreHorizontal,
+  Pause,
+  Play,
+  Plus,
+  Save,
+  Search,
+  Settings,
+  SkipBack,
+  SkipForward,
+  Star,
+  Trash2,
+  Upload
+} from 'lucide-react'
 
 type SourceType = 'youtube' | 'soundcloud' | 'local'
 type NavSection = 'browse' | 'playlists' | 'favourites' | 'settings'
@@ -99,6 +118,13 @@ function toRpcStatusText(status: {
   }
 
   return 'Discord RPC configured. Launch Discord desktop to connect.'
+}
+
+function navIcon(name: NavSection): React.JSX.Element {
+  if (name === 'browse') return <Compass className="icon" />
+  if (name === 'playlists') return <Library className="icon" />
+  if (name === 'favourites') return <Star className="icon" />
+  return <Settings className="icon" />
 }
 
 function App(): React.JSX.Element {
@@ -670,6 +696,40 @@ function App(): React.JSX.Element {
     )
   }
 
+  const renderMoreMenu = (track: Track, stopPropagation = false): React.JSX.Element => {
+    return (
+      <details className="more-menu" onClick={stopPropagation ? (event) => event.stopPropagation() : undefined}>
+        <summary
+          className="icon-only-btn more-trigger"
+          title="More"
+          onClick={stopPropagation ? (event) => event.stopPropagation() : undefined}
+        >
+          <MoreHorizontal className="icon" />
+        </summary>
+        <div className="more-menu-popover">
+          <button
+            type="button"
+            className="more-menu-item"
+            onClick={(event) => {
+              if (stopPropagation) {
+                event.stopPropagation()
+              }
+              if (!selectedPlaylistId) {
+                setActiveNav('playlists')
+                setMessage('Create a playlist first, then add tracks.')
+                return
+              }
+              addTrackToPlaylist(selectedPlaylistId, track)
+            }}
+          >
+            <ListPlus className="icon" />
+            <span>Add to playlist</span>
+          </button>
+        </div>
+      </details>
+    )
+  }
+
   return (
     <div className="window-shell">
       <div className="window-drag-region" aria-hidden="true" />
@@ -685,7 +745,10 @@ function App(): React.JSX.Element {
                 className={activeNav === item.id ? 'nav-item active' : 'nav-item'}
                 onClick={() => setActiveNav(item.id)}
               >
-                {item.label}
+                <span className="btn-with-icon">
+                  {navIcon(item.id)}
+                  <span>{item.label}</span>
+                </span>
               </button>
             ))}
           </nav>
@@ -703,8 +766,13 @@ function App(): React.JSX.Element {
                     onKeyDown={onSearchKeyDown}
                     placeholder="Search for songs here..."
                   />
-                  <button onClick={onSearch} disabled={searching}>
-                    {searching ? 'Searching...' : 'Search'}
+                  <button
+                    className="icon-only-btn"
+                    onClick={onSearch}
+                    disabled={searching}
+                    title={searching ? 'Searching' : 'Search'}
+                  >
+                    <Search className="icon" />
                   </button>
                 </div>
               </div>
@@ -721,23 +789,28 @@ function App(): React.JSX.Element {
                         </p>
                       </div>
                       <div className="search-actions">
-                        <button onClick={() => addTrackToQueue(result, true)}>Play</button>
-                        <button onClick={() => addTrackToQueue(result, false)}>Add</button>
-                        <button onClick={() => toggleFavouriteTrack(result)}>
-                          {isFavourite(result.id) ? 'Unfav' : 'Fav'}
+                        <button
+                          className="icon-only-btn"
+                          title="Play now"
+                          onClick={() => addTrackToQueue(result, true)}
+                        >
+                          <Play className="icon" />
                         </button>
                         <button
-                          onClick={() => {
-                            if (!selectedPlaylistId) {
-                              setActiveNav('playlists')
-                              setMessage('Create a playlist first, then add tracks from search.')
-                              return
-                            }
-                            addTrackToPlaylist(selectedPlaylistId, result)
-                          }}
+                          className="icon-only-btn"
+                          title="Add to queue"
+                          onClick={() => addTrackToQueue(result, false)}
                         >
-                          +PL
+                          <ListPlus className="icon" />
                         </button>
+                        <button
+                          className="icon-only-btn"
+                          title={isFavourite(result.id) ? 'Remove from favourites' : 'Add to favourites'}
+                          onClick={() => toggleFavouriteTrack(result)}
+                        >
+                          <Heart className="icon" />
+                        </button>
+                        {renderMoreMenu(result)}
                       </div>
                     </li>
                   ))
@@ -763,10 +836,15 @@ function App(): React.JSX.Element {
                   }}
                   placeholder="New playlist name"
                 />
-                <button onClick={createPlaylist}>Create</button>
+                <button className="icon-only-btn" onClick={createPlaylist} title="Create playlist">
+                  <Plus className="icon" />
+                </button>
               </div>
               <label className="upload">
-                Import local audio
+                <span className="btn-with-icon">
+                  <Upload className="icon" />
+                  <span>Import local audio</span>
+                </span>
                 <input type="file" accept="audio/*" multiple onChange={addLocalFiles} />
               </label>
 
@@ -789,7 +867,13 @@ function App(): React.JSX.Element {
                     <>
                       <div className="playlist-toolbar">
                         <p className="content-subtitle">{selectedPlaylist.trackIds.length} track(s)</p>
-                        <button onClick={() => deletePlaylist(selectedPlaylist.id)}>Delete Playlist</button>
+                        <button
+                          className="icon-only-btn"
+                          onClick={() => deletePlaylist(selectedPlaylist.id)}
+                          title="Delete playlist"
+                        >
+                          <Trash2 className="icon" />
+                        </button>
                       </div>
                       <ul className="collection-list">
                         {selectedPlaylistTracks.length ? (
@@ -803,10 +887,26 @@ function App(): React.JSX.Element {
                                 </p>
                               </div>
                               <div className="collection-actions">
-                                <button onClick={() => addTrackToQueue(track, true)}>Play</button>
-                                <button onClick={() => addTrackToQueue(track, false)}>Queue</button>
-                                <button onClick={() => removeTrackFromPlaylist(selectedPlaylist.id, track.id)}>
-                                  Remove
+                                <button
+                                  className="icon-only-btn"
+                                  title="Play now"
+                                  onClick={() => addTrackToQueue(track, true)}
+                                >
+                                  <Play className="icon" />
+                                </button>
+                                <button
+                                  className="icon-only-btn"
+                                  title="Add to queue"
+                                  onClick={() => addTrackToQueue(track, false)}
+                                >
+                                  <ListPlus className="icon" />
+                                </button>
+                                <button
+                                  className="icon-only-btn"
+                                  title="Remove track"
+                                  onClick={() => removeTrackFromPlaylist(selectedPlaylist.id, track.id)}
+                                >
+                                  <Trash2 className="icon" />
                                 </button>
                               </div>
                             </li>
@@ -840,9 +940,27 @@ function App(): React.JSX.Element {
                         </p>
                       </div>
                       <div className="collection-actions">
-                        <button onClick={() => addTrackToQueue(track, true)}>Play</button>
-                        <button onClick={() => addTrackToQueue(track, false)}>Queue</button>
-                        <button onClick={() => toggleFavouriteTrack(track)}>Remove</button>
+                        <button
+                          className="icon-only-btn"
+                          title="Play now"
+                          onClick={() => addTrackToQueue(track, true)}
+                        >
+                          <Play className="icon" />
+                        </button>
+                        <button
+                          className="icon-only-btn"
+                          title="Add to queue"
+                          onClick={() => addTrackToQueue(track, false)}
+                        >
+                          <ListPlus className="icon" />
+                        </button>
+                        <button
+                          className="icon-only-btn"
+                          title="Remove from favourites"
+                          onClick={() => toggleFavouriteTrack(track)}
+                        >
+                          <Trash2 className="icon" />
+                        </button>
                       </div>
                     </li>
                   ))
@@ -862,8 +980,12 @@ function App(): React.JSX.Element {
                 onChange={(event) => setRpcClientId(event.target.value)}
                 placeholder="Discord Client ID"
               />
-              <button onClick={saveDiscordClientId}>Save RPC Client ID</button>
-              <button onClick={sendTestRpc}>Test RPC</button>
+              <button className="icon-only-btn" title="Save RPC settings" onClick={saveDiscordClientId}>
+                <Save className="icon" />
+              </button>
+              <button className="icon-only-btn" title="Send test RPC" onClick={sendTestRpc}>
+                <FlaskConical className="icon" />
+              </button>
               <p className="rpc-status">{rpcStatusText}</p>
             </section>
           )}
@@ -908,32 +1030,34 @@ function App(): React.JSX.Element {
                 </p>
                 {currentTrack ? (
                   <div className="now-playing-actions">
-                    <button onClick={() => toggleFavouriteTrack(currentTrack)}>
-                      {isFavourite(currentTrack.id) ? 'Unfav' : 'Fav'}
-                    </button>
                     <button
-                      onClick={() => {
-                        if (!selectedPlaylistId) {
-                          setActiveNav('playlists')
-                          setMessage('Create a playlist first, then add this track.')
-                          return
-                        }
-                        addTrackToPlaylist(selectedPlaylistId, currentTrack)
-                      }}
+                      className="icon-only-btn"
+                      title={isFavourite(currentTrack.id) ? 'Remove from favourites' : 'Add to favourites'}
+                      onClick={() => toggleFavouriteTrack(currentTrack)}
                     >
-                      +Playlist
+                      <Heart className="icon" />
                     </button>
+                    {renderMoreMenu(currentTrack)}
                   </div>
                 ) : null}
               </div>
             </div>
 
             <div className="transport">
-              <button onClick={goPrev}>Prev</button>
-              <button onClick={togglePlayback} disabled={!currentTrack}>
-                {isPlaying ? 'Pause' : 'Play'}
+              <button className="icon-only-btn" title="Previous" onClick={goPrev}>
+                <SkipBack className="icon" />
               </button>
-              <button onClick={goNext}>Next</button>
+              <button
+                className="icon-only-btn"
+                title={isPlaying ? 'Pause' : 'Play'}
+                onClick={togglePlayback}
+                disabled={!currentTrack}
+              >
+                {isPlaying ? <Pause className="icon" /> : <Play className="icon" />}
+              </button>
+              <button className="icon-only-btn" title="Next" onClick={goNext}>
+                <SkipForward className="icon" />
+              </button>
             </div>
 
             <div className="progress-wrap">
@@ -978,26 +1102,16 @@ function App(): React.JSX.Element {
                     <span className={SOURCE_STYLES[track.source]}>{sourceLabel[track.source]}</span>
                     <div className="queue-mini-actions">
                       <button
+                        className="icon-only-btn"
+                        title={isFavourite(track.id) ? 'Remove from favourites' : 'Add to favourites'}
                         onClick={(event) => {
                           event.stopPropagation()
                           toggleFavouriteTrack(track)
                         }}
                       >
-                        {isFavourite(track.id) ? 'Unfav' : 'Fav'}
+                        <Heart className="icon" />
                       </button>
-                      <button
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          if (!selectedPlaylistId) {
-                            setActiveNav('playlists')
-                            setMessage('Create a playlist first, then add tracks from queue.')
-                            return
-                          }
-                          addTrackToPlaylist(selectedPlaylistId, track)
-                        }}
-                      >
-                        +PL
-                      </button>
+                      {renderMoreMenu(track, true)}
                     </div>
                   </div>
                 </li>

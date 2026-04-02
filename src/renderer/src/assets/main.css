@@ -200,6 +200,23 @@ button {
   font: inherit;
 }
 
+.icon {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+.btn-with-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.nav-item .btn-with-icon {
+  justify-content: flex-start;
+}
+
 .panel input,
 .search-bar input,
 .settings-panel input {
@@ -562,6 +579,7 @@ button:disabled {
 .search-actions {
   display: flex;
   gap: 6px;
+  align-items: center;
 }
 
 .search-actions button {
@@ -578,6 +596,50 @@ button:disabled {
 
 .search-actions button:not(:first-child):hover {
   background: #363636;
+  box-shadow: none;
+}
+
+.more-menu {
+  position: relative;
+}
+
+.more-menu summary {
+  list-style: none;
+}
+
+.more-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.more-menu-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  min-width: 170px;
+  padding: 6px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--sp-border-soft);
+  background: #111214;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35);
+}
+
+.more-menu-item {
+  width: 100%;
+  border-radius: var(--radius-sm);
+  border: 0;
+  padding: 8px 10px;
+  background: transparent;
+  color: var(--sp-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  box-shadow: none;
+}
+
+.more-menu-item:hover {
+  background: #232428;
   box-shadow: none;
 }
 
@@ -728,6 +790,19 @@ button:disabled {
   min-width: 48px;
   padding: 5px 8px;
   font-size: 11px;
+}
+
+.icon-only-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 28px !important;
+  min-width: 28px !important;
+  height: 28px;
+  padding: 0 !important;
+}
+
+.more-trigger {
+  cursor: pointer;
 }
 
 .queue-title {
