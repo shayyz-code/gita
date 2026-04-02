@@ -43,6 +43,22 @@ type MusicPlaybackResponse = {
   playbackUrl: string
 }
 
+type CollectionTrack = {
+  id: string
+  source: 'youtube' | 'soundcloud' | 'local'
+  url: string
+  title: string
+  artist: string
+  durationSec: number
+  thumbnail?: string
+}
+
+type CollectionState = {
+  playlists: Array<{ id: string; name: string; trackIds: string[] }>
+  favourites: string[]
+  library: Record<string, CollectionTrack>
+}
+
 const api = {
   rpcSetClientId: (clientId: string): Promise<RpcStatus> =>
     ipcRenderer.invoke('rpc:set-client-id', clientId),
@@ -52,7 +68,10 @@ const api = {
   rpcClearPresence: (): Promise<RpcStatus> => ipcRenderer.invoke('rpc:clear-presence'),
   musicSearch: (query: string): Promise<MusicSearchResult[]> => ipcRenderer.invoke('music:search', query),
   musicGetPlaybackUrl: (payload: MusicPlaybackRequest): Promise<MusicPlaybackResponse> =>
-    ipcRenderer.invoke('music:get-playback-url', payload)
+    ipcRenderer.invoke('music:get-playback-url', payload),
+  collectionsGetState: (): Promise<CollectionState> => ipcRenderer.invoke('collections:get-state'),
+  collectionsSetState: (payload: CollectionState): Promise<boolean> =>
+    ipcRenderer.invoke('collections:set-state', payload)
 }
 
 if (process.contextIsolated) {
@@ -72,6 +91,7 @@ if (process.contextIsolated) {
 export type {
   MusicPlaybackRequest,
   MusicPlaybackResponse,
+  CollectionState,
   MusicSearchResult,
   MusicSource,
   RpcPresence,

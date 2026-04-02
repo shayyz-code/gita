@@ -42,6 +42,22 @@ export type MusicPlaybackResponse = {
   playbackUrl: string
 }
 
+export type CollectionTrack = {
+  id: string
+  source: 'youtube' | 'soundcloud' | 'local'
+  url: string
+  title: string
+  artist: string
+  durationSec: number
+  thumbnail?: string
+}
+
+export type CollectionState = {
+  playlists: Array<{ id: string; name: string; trackIds: string[] }>
+  favourites: string[]
+  library: Record<string, CollectionTrack>
+}
+
 export type RendererApi = {
   rpcSetClientId: (clientId: string) => Promise<RpcStatus>
   rpcGetStatus: () => Promise<RpcStatus>
@@ -49,6 +65,8 @@ export type RendererApi = {
   rpcClearPresence: () => Promise<RpcStatus>
   musicSearch: (query: string) => Promise<MusicSearchResult[]>
   musicGetPlaybackUrl: (payload: MusicPlaybackRequest) => Promise<MusicPlaybackResponse>
+  collectionsGetState: () => Promise<CollectionState>
+  collectionsSetState: (payload: CollectionState) => Promise<boolean>
 }
 
 declare global {

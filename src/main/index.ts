@@ -1,5 +1,5 @@
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
-import { existsSync, readFileSync } from 'fs'
+import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -8,6 +8,50 @@ import { MusicService, type PlaybackRequest } from './musicService'
 
 const rpc = new DiscordRpcBridge()
 const musicService = new MusicService()
+const COLLECTIONS_FILE_NAME = 'gita-collections.json'
+
+type CollectionTrack = {
+  id: string
+  source: 'youtube' | 'soundcloud' | 'local'
+  url: string
+  title: string
+  artist: string
+  durationSec: number
+  thumbnail?: string
+}
+
+type CollectionState = {
+  playlists: Array<{ id: string; name: string; trackIds: string[] }>
+  favourites: string[]
+  library: Record<string, CollectionTrack>
+}
+
+function collectionsFilePath(): string {
+  return join(app.getPath('userData'), COLLECTIONS_FILE_NAME)
+}
+
+function readCollectionState(): CollectionState {
+  const fallback: CollectionState = { playlists: [], favourites: [], library: {} }
+  const filePath = collectionsFilePath()
+  if (!existsSync(filePath)) {
+    return fallback
+  }
+
+  try {
+    const parsed = JSON.parse(readFileSync(filePath, 'utf8')) as Partial<CollectionState>
+    return {
+      playlists: Array.isArray(parsed.playlists) ? parsed.playlists : [],
+      favourites: Array.isArray(parsed.favourites) ? parsed.favourites : [],
+      library: parsed.library && typeof parsed.library === 'object' ? parsed.library : {}
+    }
+  } catch {
+    return fallback
+  }
+}
+
+function writeCollectionState(payload: CollectionState): void {
+  writeFileSync(collectionsFilePath(), JSON.stringify(payload, null, 2), 'utf8')
+}
 
 function readClientIdFromDotEnv(): string {
   const envFiles = [join(process.cwd(), '.env.local'), join(process.cwd(), '.env')]
@@ -114,6 +158,15 @@ app.whenReady().then(() => {
 
   ipcMain.handle('music:get-playback-url', async (_, payload: PlaybackRequest) => {
     return musicService.getPlaybackUrl(payload)
+  })
+
+  ipcMain.handle('collections:get-state', async () => {
+    return readCollectionState()
+  })
+
+  ipcMain.handle('collections:set-state', async (_, payload: CollectionState) => {
+    writeCollectionState(payload)
+    return true
   })
 
   const envClientId = (

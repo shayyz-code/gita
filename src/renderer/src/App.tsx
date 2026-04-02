@@ -41,10 +41,6 @@ type Playlist = {
 
 type TrackLibrary = Record<string, Track>
 
-const PLAYLISTS_STORAGE_KEY = 'gita.playlists.v1'
-const FAVOURITES_STORAGE_KEY = 'gita.favourites.v1'
-const LIBRARY_STORAGE_KEY = 'gita.trackLibrary.v1'
-
 const sourceLabel: Record<SourceType, string> = {
   youtube: 'YouTube',
   soundcloud: 'SoundCloud',
@@ -65,18 +61,6 @@ const NAV_ITEMS: Array<{ id: NavSection; label: string }> = [
 ]
 
 const envDiscordClientId = (import.meta.env.VITE_DISCORD_CLIENT_ID || '').trim()
-
-function parseStorageJson<T>(raw: string | null, fallback: T): T {
-  if (!raw) {
-    return fallback
-  }
-
-  try {
-    return JSON.parse(raw) as T
-  } catch {
-    return fallback
-  }
-}
 
 function formatTime(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds <= 0) {
@@ -142,15 +126,9 @@ function App(): React.JSX.Element {
   const [activeNav, setActiveNav] = useState<NavSection>('browse')
   const [playlistDraftName, setPlaylistDraftName] = useState('')
   const [selectedPlaylistId, setSelectedPlaylistId] = useState('')
-  const [playlists, setPlaylists] = useState<Playlist[]>(() =>
-    parseStorageJson<Playlist[]>(localStorage.getItem(PLAYLISTS_STORAGE_KEY), [])
-  )
-  const [favouriteTrackIds, setFavouriteTrackIds] = useState<string[]>(() =>
-    parseStorageJson<string[]>(localStorage.getItem(FAVOURITES_STORAGE_KEY), [])
-  )
-  const [trackLibrary, setTrackLibrary] = useState<TrackLibrary>(() =>
-    parseStorageJson<TrackLibrary>(localStorage.getItem(LIBRARY_STORAGE_KEY), {})
-  )
+  const [playlists, setPlaylists] = useState<Playlist[]>([])
+  const [favouriteTrackIds, setFavouriteTrackIds] = useState<string[]>([])
+  const [trackLibrary, setTrackLibrary] = useState<TrackLibrary>({})
 
   const [rpcClientId, setRpcClientId] = useState(
     () => envDiscordClientId || localStorage.getItem('gita.discordClientId') || ''
@@ -162,6 +140,7 @@ function App(): React.JSX.Element {
   const retryByTrackRef = useRef<Record<string, number>>({})
   const initialRpcClientIdRef = useRef(rpcClientId)
   const tracksRef = useRef<Track[]>([])
+  const collectionsHydratedRef = useRef(false)
 
   const currentTrack = currentIndex >= 0 ? (tracks[currentIndex] ?? null) : null
   const canSeek = currentTrack?.source === 'local'
@@ -180,16 +159,30 @@ function App(): React.JSX.Element {
   }, [tracks])
 
   useEffect(() => {
-    localStorage.setItem(PLAYLISTS_STORAGE_KEY, JSON.stringify(playlists))
-  }, [playlists])
+    void window.api
+      .collectionsGetState()
+      .then((state) => {
+        setPlaylists(state.playlists || [])
+        setFavouriteTrackIds(state.favourites || [])
+        setTrackLibrary(state.library || {})
+        collectionsHydratedRef.current = true
+      })
+      .catch(() => {
+        collectionsHydratedRef.current = true
+      })
+  }, [])
 
   useEffect(() => {
-    localStorage.setItem(FAVOURITES_STORAGE_KEY, JSON.stringify(favouriteTrackIds))
-  }, [favouriteTrackIds])
+    if (!collectionsHydratedRef.current) {
+      return
+    }
 
-  useEffect(() => {
-    localStorage.setItem(LIBRARY_STORAGE_KEY, JSON.stringify(trackLibrary))
-  }, [trackLibrary])
+    void window.api.collectionsSetState({
+      playlists,
+      favourites: favouriteTrackIds,
+      library: trackLibrary
+    })
+  }, [playlists, favouriteTrackIds, trackLibrary])
 
   useEffect(() => {
     if (!playlists.length) {
@@ -494,23 +487,33 @@ function App(): React.JSX.Element {
 
     registerTrackInLibrary(track)
 
+    let targetName = 'playlist'
+    let wasAdded = false
+
     setPlaylists((prev) =>
       prev.map((playlist) => {
         if (playlist.id !== playlistId) {
           return playlist
         }
 
+        targetName = playlist.name
         if (playlist.trackIds.includes(track.id)) {
           return playlist
         }
 
+        wasAdded = true
         return {
           ...playlist,
           trackIds: [...playlist.trackIds, track.id]
         }
       })
     )
-    setMessage(`Added "${track.title}" to playlist.`)
+
+    if (wasAdded) {
+      setMessage(`Added "${track.title}" to "${targetName}".`)
+    } else {
+      setMessage(`"${track.title}" is already in "${targetName}".`)
+    }
   }
 
   const removeTrackFromPlaylist = (playlistId: string, trackId: string): void => {
@@ -707,24 +710,39 @@ function App(): React.JSX.Element {
           <MoreHorizontal className="icon" />
         </summary>
         <div className="more-menu-popover">
-          <button
-            type="button"
-            className="more-menu-item"
-            onClick={(event) => {
-              if (stopPropagation) {
-                event.stopPropagation()
-              }
-              if (!selectedPlaylistId) {
+          {playlists.length ? (
+            playlists.map((playlist) => (
+              <button
+                key={`${track.id}:${playlist.id}`}
+                type="button"
+                className="more-menu-item"
+                onClick={(event) => {
+                  if (stopPropagation) {
+                    event.stopPropagation()
+                  }
+                  addTrackToPlaylist(playlist.id, track)
+                }}
+              >
+                <ListPlus className="icon" />
+                <span>Add to {playlist.name}</span>
+              </button>
+            ))
+          ) : (
+            <button
+              type="button"
+              className="more-menu-item"
+              onClick={(event) => {
+                if (stopPropagation) {
+                  event.stopPropagation()
+                }
                 setActiveNav('playlists')
-                setMessage('Create a playlist first, then add tracks.')
-                return
-              }
-              addTrackToPlaylist(selectedPlaylistId, track)
-            }}
-          >
-            <ListPlus className="icon" />
-            <span>Add to playlist</span>
-          </button>
+                setMessage('Create a playlist first, then add tracks from More menu.')
+              }}
+            >
+              <Plus className="icon" />
+              <span>Create playlist</span>
+            </button>
+          )}
         </div>
       </details>
     )
