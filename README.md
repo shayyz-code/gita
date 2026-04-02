@@ -1,10 +1,14 @@
-[![Electron](https://img.shields.io/badge/Electron-39-2B2E3A?logo=electron&logoColor=white)](https://www.electronjs.org/)
-[![React](https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white)](https://react.dev/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![pnpm](https://img.shields.io/badge/pnpm-10-F69220?logo=pnpm&logoColor=white)](https://pnpm.io/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](/LICENSE)
+[![Electron](https://img.shields.io/badge/Electron-39-2B2E3A?logo=electron&logoColor=white&style=for-the-badge)](https://www.electronjs.org/)
+[![React](https://img.shields.io/badge/React-19-149ECA?logo=react&logoColor=white&style=for-the-badge)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white&style=for-the-badge)](https://www.typescriptlang.org/)
+[![pnpm](https://img.shields.io/badge/pnpm-10-F69220?logo=pnpm&logoColor=white&style=for-the-badge)](https://pnpm.io/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](/LICENSE)
 
-# Gita
+<p align="center">
+  <img width="1280" height="640" alt="gita-banner" src="https://github.com/user-attachments/assets/acbce5ee-9ec6-4546-a41a-2c6527ac2836" />
+</p>
+
+# Gita - ဂီတ
 
 Open-source music player with:
 - Discord Rich Presence integration
