@@ -2,6 +2,7 @@
   "name": "gita",
   "version": "1.0.0",
   "description": "Open source Music Streaming application with Discord RPC",
+  "license": "MIT",
   "main": "./out/main/index.js",
   "author": "shayy <aungminkhant.shay@gmail.com>",
   "homepage": "https://codewithshayy.com/gita",
