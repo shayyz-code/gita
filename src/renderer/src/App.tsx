@@ -73,6 +73,7 @@ function App(): React.JSX.Element {
   const retryByTrackRef = useRef<Record<string, number>>({})
   const initialRpcClientIdRef = useRef(rpcClientId)
   const tracksRef = useRef<Track[]>([])
+  const currentIndexRef = useRef(-1)
   const collectionsHydratedRef = useRef(false)
 
   function resolveTrackById(trackId: string): Track | null {
@@ -98,6 +99,10 @@ function App(): React.JSX.Element {
   useEffect(() => {
     tracksRef.current = tracks
   }, [tracks])
+
+  useEffect(() => {
+    currentIndexRef.current = currentIndex
+  }, [currentIndex])
 
   useEffect(() => {
     void window.api
@@ -278,7 +283,8 @@ function App(): React.JSX.Element {
   }
 
   const activateTrack = (nextIndex: number): void => {
-    const selectedTrack = tracks[nextIndex]
+    const queue = tracksRef.current
+    const selectedTrack = queue[nextIndex]
     if (!selectedTrack) {
       return
     }
@@ -303,16 +309,25 @@ function App(): React.JSX.Element {
       if (exists) {
         const existingIndex = prev.findIndex((item) => item.id === track.id)
         if (playNow && existingIndex >= 0) {
-          window.setTimeout(() => activateTrack(existingIndex), 0)
+          window.setTimeout(() => {
+            const latestIndex = tracksRef.current.findIndex((item) => item.id === track.id)
+            if (latestIndex >= 0) {
+              activateTrack(latestIndex)
+            }
+          }, 0)
         }
 
         return prev
       }
 
       const next = [...prev, track]
-      const nextIndex = next.length - 1
       if (playNow) {
-        window.setTimeout(() => activateTrack(nextIndex), 0)
+        window.setTimeout(() => {
+          const latestIndex = tracksRef.current.findIndex((item) => item.id === track.id)
+          if (latestIndex >= 0) {
+            activateTrack(latestIndex)
+          }
+        }, 0)
       }
 
       return next
@@ -542,13 +557,20 @@ function App(): React.JSX.Element {
       }
     })
 
-    const startIndex = tracks.length
     setTracks((prev) => [...prev, ...localTracks])
     setMessage(`${localTracks.length} local track${localTracks.length > 1 ? 's' : ''} added.`)
     event.target.value = ''
 
     if (currentIndex < 0) {
-      window.setTimeout(() => activateTrack(startIndex), 0)
+      const firstLocalId = localTracks[0]?.id
+      if (firstLocalId) {
+        window.setTimeout(() => {
+          const latestIndex = tracksRef.current.findIndex((item) => item.id === firstLocalId)
+          if (latestIndex >= 0) {
+            activateTrack(latestIndex)
+          }
+        }, 0)
+      }
     }
   }
 
@@ -561,20 +583,24 @@ function App(): React.JSX.Element {
   }
 
   const goNext = (): void => {
-    if (!tracks.length) {
+    const queue = tracksRef.current
+    if (!queue.length) {
       return
     }
 
-    const nextIndex = currentIndex < 0 ? 0 : (currentIndex + 1) % tracks.length
+    const activeIndex = currentIndexRef.current
+    const nextIndex = activeIndex < 0 ? 0 : (activeIndex + 1) % queue.length
     activateTrack(nextIndex)
   }
 
   const goPrev = (): void => {
-    if (!tracks.length) {
+    const queue = tracksRef.current
+    if (!queue.length) {
       return
     }
 
-    const nextIndex = currentIndex < 0 ? 0 : (currentIndex - 1 + tracks.length) % tracks.length
+    const activeIndex = currentIndexRef.current
+    const nextIndex = activeIndex < 0 ? 0 : (activeIndex - 1 + queue.length) % queue.length
     activateTrack(nextIndex)
   }
 
